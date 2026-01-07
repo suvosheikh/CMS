@@ -6,8 +6,11 @@ import {
   Plus, Trash2, Folder, FolderPlus, Tag, X, 
   AlertTriangle, Layers, Info, 
   ChevronRight, ChevronDown, Package,
-  RefreshCcw, FolderTree, ShieldAlert
+  RefreshCcw, FolderTree, ShieldAlert,
+  Eye, ExternalLink, Calendar as CalIcon,
+  Search, History
 } from 'lucide-react';
+import { ConfirmationModal } from '../components/ConfirmationModal';
 
 export const Categories: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -22,6 +25,11 @@ export const Categories: React.FC = () => {
   
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
   const [reassignParentId, setReassignParentId] = useState<string | 'DELETE_ALL'>('DELETE_ALL');
+  
+  const [simpleDeleteCat, setSimpleDeleteCat] = useState<Category | null>(null);
+
+  // New state for viewing brand-specific posts
+  const [selectedBrandForViewing, setSelectedBrandForViewing] = useState<Category | null>(null);
 
   const fetchData = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -67,6 +75,11 @@ export const Categories: React.FC = () => {
     return counts;
   }, [categories, posts]);
 
+  const brandPosts = useMemo(() => {
+    if (!selectedBrandForViewing) return [];
+    return posts.filter(p => p.brand_type_id === selectedBrandForViewing.id);
+  }, [posts, selectedBrandForViewing]);
+
   const toggleExpand = (id: string) => {
     setExpandedIds(prev => {
       const next = new Set(prev);
@@ -109,14 +122,18 @@ export const Categories: React.FC = () => {
     if (!isAdmin) return;
     const children = getChildCategories(cat.id);
     if (children.length === 0) {
-      if (confirm(`Delete ${cat.name}?`)) {
-        await DBService.deleteCategory(cat.id);
-        fetchData(true);
-      }
+      setSimpleDeleteCat(cat);
     } else {
       setCategoryToDelete(cat);
       setReassignParentId('DELETE_ALL');
     }
+  };
+
+  const handleSimpleDelete = async () => {
+    if (!simpleDeleteCat || !isAdmin) return;
+    await DBService.deleteCategory(simpleDeleteCat.id);
+    setSimpleDeleteCat(null);
+    fetchData(true);
   };
 
   const finalizeDelete = async () => {
@@ -162,10 +179,16 @@ export const Categories: React.FC = () => {
           return (
             <div key={cat.id} className="space-y-3">
               <div 
-                onClick={() => hasChildren && toggleExpand(cat.id)}
+                onClick={() => {
+                  if (hasChildren) {
+                    toggleExpand(cat.id);
+                  } else if (level === 2) {
+                    setSelectedBrandForViewing(cat);
+                  }
+                }}
                 className={`flex items-center justify-between p-4 bg-white border rounded-2xl transition-all group cursor-pointer outline-none select-none ${
                   level === 0 ? 'border-slate-100 shadow-sm' : 'border-slate-50'
-                } ${isExpanded ? 'border-blue-200 bg-blue-50/20' : 'hover:border-blue-200'}`}
+                } ${isExpanded || (level === 2 && selectedBrandForViewing?.id === cat.id) ? 'border-blue-200 bg-blue-50/20' : 'hover:border-blue-200'} ${level === 2 ? 'hover:shadow-lg hover:shadow-blue-50' : ''}`}
               >
                 <div className="flex items-center gap-4">
                   <div className="flex items-center justify-center w-6 text-slate-300">
@@ -202,6 +225,15 @@ export const Categories: React.FC = () => {
                 </div>
 
                 <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                  {level === 2 && (
+                    <button 
+                      onClick={() => setSelectedBrandForViewing(cat)}
+                      className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors outline-none flex items-center gap-1"
+                      title="View Assigned Posts"
+                    >
+                      <Eye size={18} strokeWidth={3} />
+                    </button>
+                  )}
                   {level < 2 && isEditor && (
                     <button 
                       onClick={() => { setParentId(cat.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
@@ -346,6 +378,94 @@ export const Categories: React.FC = () => {
         </div>
       </div>
 
+      {/* Brand Posts Modal */}
+      {selectedBrandForViewing && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300 border border-white/20">
+            <div className="p-10 border-b border-slate-50 flex items-center justify-between bg-slate-50/30 sticky top-0 z-10">
+              <div className="flex items-center gap-5">
+                <div className="w-14 h-14 bg-amber-500 rounded-[1.5rem] flex items-center justify-center text-white shadow-xl shadow-amber-100">
+                  <Package size={28} strokeWidth={2.5}/>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black text-slate-900 tracking-tighter">{selectedBrandForViewing.name} - Content Feed</h2>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Assigned Repository Entries</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedBrandForViewing(null)}
+                className="w-10 h-10 flex items-center justify-center bg-white border border-slate-100 rounded-full text-slate-300 hover:text-slate-900 transition-all shadow-sm"
+              >
+                <X size={20} strokeWidth={3} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-10">
+              {brandPosts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-300 space-y-4">
+                  <Search size={48} strokeWidth={1.5} />
+                  <p className="text-sm font-bold uppercase tracking-widest">No products assigned to this brand.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {brandPosts.map((post) => (
+                    <div key={post.id} className="group p-6 bg-white border border-slate-100 rounded-2xl flex items-center justify-between hover:border-blue-200 transition-all hover:shadow-lg hover:shadow-blue-50/50">
+                       <div className="flex items-center gap-6">
+                          <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-slate-400 group-hover:text-blue-600 group-hover:bg-blue-50 transition-all">
+                            <CalIcon size={20} />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-3">
+                              <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{post.id}</p>
+                              <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest border ${
+                                post.status === 'Published' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                post.status === 'Designed' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                'bg-slate-50 text-slate-400 border-slate-100'
+                              }`}>
+                                {post.status}
+                              </span>
+                            </div>
+                            <p className="text-base font-black text-slate-800 tracking-tight mt-1">{post.product_model || 'No Model Name'}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                               <span className="text-[9px] font-black text-slate-400 uppercase bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{post.content_type}</span>
+                               <span className="text-[9px] font-black text-slate-400 uppercase bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{post.content_tag}</span>
+                            </div>
+                          </div>
+                       </div>
+                       
+                       <div className="flex items-center gap-6">
+                         <div className="text-right hidden sm:block">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Publish Date</p>
+                            <p className="text-xs font-black text-slate-800">{new Date(post.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                         </div>
+                         {post.asset_link && (
+                           <a 
+                             href={post.asset_link} 
+                             target="_blank" 
+                             rel="noreferrer" 
+                             className="p-3 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all active:scale-95"
+                           >
+                             <ExternalLink size={16} strokeWidth={3} />
+                           </a>
+                         )}
+                       </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="p-8 border-t border-slate-50 bg-slate-50/20 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <History size={16} className="text-slate-300" />
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Repository Status: Sync Active</span>
+              </div>
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{brandPosts.length} Results Found</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {categoryToDelete && isAdmin && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
           <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
@@ -371,6 +491,14 @@ export const Categories: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal 
+        isOpen={!!simpleDeleteCat}
+        title="Delete Segment?"
+        message={`Confirming permanent removal of the segment "${simpleDeleteCat?.name}". This action cannot be undone.`}
+        onConfirm={handleSimpleDelete}
+        onCancel={() => setSimpleDeleteCat(null)}
+      />
     </div>
   );
 };

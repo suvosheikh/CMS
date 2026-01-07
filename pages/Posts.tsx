@@ -8,6 +8,7 @@ import {
   Layers, Package, Monitor, X, Clock, History, CheckCircle, ShieldAlert
 } from 'lucide-react';
 import { PostModal } from '../components/PostModal';
+import { ConfirmationModal } from '../components/ConfirmationModal';
 
 export const Posts: React.FC = () => {
   const [posts, setPosts] = useState<PostLog[]>([]);
@@ -21,6 +22,7 @@ export const Posts: React.FC = () => {
   const [filterCat, setFilterCat] = useState('');
   
   const [selectedModelHistory, setSelectedModelHistory] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const fetchData = () => {
     setLoading(true);
@@ -78,12 +80,11 @@ export const Posts: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!isAdmin) return;
-    if (confirm('Permanently remove this content log from the workspace?')) {
-      await DBService.deletePost(id);
-      fetchData();
-    }
+  const handleDelete = async () => {
+    if (!isAdmin || !deleteConfirmId) return;
+    await DBService.deletePost(deleteConfirmId);
+    setDeleteConfirmId(null);
+    fetchData();
   };
 
   const getCatName = (id: string) => categories.find(c => c.id === id)?.name || 'N/A';
@@ -257,7 +258,7 @@ export const Posts: React.FC = () => {
                             )}
                             {isAdmin && (
                               <button 
-                                onClick={() => handleDelete(post.id)}
+                                onClick={() => setDeleteConfirmId(post.id)}
                                 className="p-3 text-slate-400 hover:text-red-600 hover:bg-white hover:shadow-lg hover:shadow-red-100 rounded-2xl transition-all active:scale-90"
                               >
                                 <Trash2 size={16} strokeWidth={3} />
@@ -337,6 +338,14 @@ export const Posts: React.FC = () => {
           initialData={editingPost}
         />
       )}
+
+      <ConfirmationModal 
+        isOpen={!!deleteConfirmId}
+        title="Confirm Purge"
+        message="Are you certain you want to permanently remove this content log from the global repository? This action is irreversible."
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteConfirmId(null)}
+      />
     </div>
   );
 };

@@ -5,6 +5,7 @@ import { User, Role } from '../types';
 import { Users, UserPlus, Shield, Mail, Trash2, Edit2, ShieldCheck, ShieldAlert, X, Save, Lock, UserCheck, AlertTriangle } from 'lucide-react';
 import { ROLES } from '../constants';
 import { useNavigate } from 'react-router-dom';
+import { ConfirmationModal } from '../components/ConfirmationModal';
 
 export const UserManagement: React.FC = () => {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ export const UserManagement: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState<Partial<User>>({ 
     name: '', 
@@ -76,16 +78,16 @@ export const UserManagement: React.FC = () => {
     fetchData();
   };
 
-  const handleDeleteUser = async (id: string) => {
-    if (!isAdmin) return;
-    if (id === currentUser?.id) {
+  const handleDeleteUser = async () => {
+    if (!isAdmin || !deleteConfirmId) return;
+    if (deleteConfirmId === currentUser?.id) {
       alert("Self-deletion protocol blocked. Another admin must revoke your access.");
+      setDeleteConfirmId(null);
       return;
     }
-    if (confirm('Permanently revoke workspace access for this identity?')) {
-      await DBService.deleteUser(id);
-      fetchData();
-    }
+    await DBService.deleteUser(deleteConfirmId);
+    setDeleteConfirmId(null);
+    fetchData();
   };
 
   const getRoleBadge = (role: Role) => {
@@ -141,7 +143,7 @@ export const UserManagement: React.FC = () => {
             <div className="absolute top-0 right-0 p-8 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <button onClick={() => handleOpenModal(user)} className="p-3 bg-white border border-slate-100 text-slate-300 hover:text-blue-600 rounded-2xl shadow-sm transition-all"><Edit2 size={16}/></button>
               {user.id !== currentUser?.id && (
-                <button onClick={() => handleDeleteUser(user.id)} className="p-3 bg-white border border-slate-100 text-slate-300 hover:text-red-500 rounded-2xl shadow-sm transition-all"><Trash2 size={16}/></button>
+                <button onClick={() => setDeleteConfirmId(user.id)} className="p-3 bg-white border border-slate-100 text-slate-300 hover:text-red-500 rounded-2xl shadow-sm transition-all"><Trash2 size={16}/></button>
               )}
             </div>
             <div className="flex flex-col items-center text-center">
@@ -219,6 +221,14 @@ export const UserManagement: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal 
+        isOpen={!!deleteConfirmId}
+        title="Revoke Access?"
+        message="Are you certain you wish to permanently terminate this user's identity and access to the dashboard? This cannot be undone."
+        onConfirm={handleDeleteUser}
+        onCancel={() => setDeleteConfirmId(null)}
+      />
     </div>
   );
 };

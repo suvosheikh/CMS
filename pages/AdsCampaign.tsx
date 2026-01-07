@@ -9,6 +9,7 @@ import {
   Calendar, TrendingUp, DollarSign, Activity, Flag,
   Clock, ShieldAlert
 } from 'lucide-react';
+import { ConfirmationModal } from '../components/ConfirmationModal';
 
 export const AdsCampaign: React.FC = () => {
   const [campaigns, setCampaigns] = useState<AdCampaignEntry[]>([]);
@@ -17,6 +18,7 @@ export const AdsCampaign: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCamp, setEditingCamp] = useState<AdCampaignEntry | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<Partial<AdCampaignEntry>>({
     platform: 'Meta',
@@ -100,12 +102,11 @@ export const AdsCampaign: React.FC = () => {
     fetchData();
   };
 
-  const handleDelete = async (id: string) => {
-    if (!isAdmin) return;
-    if (confirm('Permanently delete this ad record?')) {
-      await DBService.deleteAdsCampaign(id);
-      fetchData();
-    }
+  const handleDelete = async () => {
+    if (!isAdmin || !deleteConfirmId) return;
+    await DBService.deleteAdsCampaign(deleteConfirmId);
+    setDeleteConfirmId(null);
+    fetchData();
   };
 
   const getStatusStyle = (status: AdStatus) => {
@@ -230,7 +231,7 @@ export const AdsCampaign: React.FC = () => {
                       <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all">
                          <Link to={`/ads/${camp.id}`} className="p-2.5 bg-white border border-slate-100 text-slate-300 hover:text-blue-600 rounded-xl transition-all shadow-sm"><Eye size={16}/></Link>
                          {isEditor && <button onClick={() => handleOpenModal(camp)} className="p-2.5 bg-white border border-slate-100 text-slate-300 hover:text-slate-900 rounded-xl transition-all shadow-sm"><Edit2 size={16}/></button>}
-                         {isAdmin && <button onClick={() => handleDelete(camp.id)} className="p-2.5 bg-white border border-slate-100 text-slate-300 hover:text-red-500 rounded-xl transition-all shadow-sm"><Trash2 size={16}/></button>}
+                         {isAdmin && <button onClick={() => setDeleteConfirmId(camp.id)} className="p-2.5 bg-white border border-slate-100 text-slate-300 hover:text-red-500 rounded-xl transition-all shadow-sm"><Trash2 size={16}/></button>}
                       </div>
                     </td>
                   )}
@@ -252,7 +253,6 @@ export const AdsCampaign: React.FC = () => {
                <button onClick={() => setIsModalOpen(false)} className="w-12 h-12 flex items-center justify-center bg-white border border-slate-100 rounded-full text-slate-300 hover:text-slate-900 transition-all"><X size={24}/></button>
             </div>
             <form onSubmit={handleSave} className="p-10 space-y-10">
-              {/* Form implementation remains same but logic check 'isEditor' added above */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="col-span-2 space-y-6">
                    <div className="grid grid-cols-2 gap-6">
@@ -299,6 +299,14 @@ export const AdsCampaign: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal 
+        isOpen={!!deleteConfirmId}
+        title="Delete Ad Entry?"
+        message="Are you sure you want to permanently discard this ad registry? Performance history for this unit will be lost."
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteConfirmId(null)}
+      />
     </div>
   );
 };
