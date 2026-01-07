@@ -114,6 +114,8 @@ const App: React.FC = () => {
     );
   }
 
+  const isAdmin = currentUser.role === 'Admin';
+
   return (
     <Router>
       <div className="flex min-h-screen bg-slate-50/50">
@@ -131,7 +133,10 @@ const App: React.FC = () => {
                 <Route path="/ads" element={<AdsCampaign />} />
                 <Route path="/ads/:id" element={<AdDetails />} />
                 <Route path="/creative-store" element={<CreativeStore />} />
-                <Route path="/users" element={<UserManagement />} />
+                <Route 
+                  path="/users" 
+                  element={isAdmin ? <UserManagement /> : <Navigate to="/" replace />} 
+                />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>

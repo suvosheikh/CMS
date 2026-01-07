@@ -86,6 +86,8 @@ export const Sidebar: React.FC<{ onLogout?: () => void }> = ({ onLogout }) => {
     fetchData();
   }, [location.pathname]);
 
+  const isAdmin = currentUser?.role === 'Admin';
+
   return (
     <div className="w-72 h-screen bg-white border-r border-slate-100 flex flex-col fixed left-0 top-0 z-50">
       <div className="p-8 flex items-center gap-3">
@@ -106,7 +108,9 @@ export const Sidebar: React.FC<{ onLogout?: () => void }> = ({ onLogout }) => {
         <NavItem to="/campaigns" icon={<BarChart3 size={18} />} label="Reports" />
         <NavItem to="/ads" icon={<Megaphone size={18} />} label="Ads Campaign" badge={counts.ads} />
         <NavItem to="/creative-store" icon={<Paintbrush size={18} />} label="Creative Store" badge={counts.creatives} />
-        <NavItem to="/users" icon={<Users size={18} />} label="User Access" badge={counts.users} />
+        {isAdmin && (
+          <NavItem to="/users" icon={<Users size={18} />} label="User Access" badge={counts.users} />
+        )}
       </nav>
 
       <div className="p-6">

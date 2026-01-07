@@ -1,33 +1,50 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { DBService } from '../services/dbService';
-import { CreativeLog, User, CreativePlatform, CreativeMedium, CreativeSubOption } from '../types';
+import { CreativeLog, User, CreativePlatform, CreativeMedium, CreativeSubOption, CreativeDesigner } from '../types';
 import { 
   Paintbrush, Plus, Trash2, Edit2, X, Save, 
   Search, CheckCircle2,
   Calendar, TrendingUp, LayoutList,
   Monitor, FileImage, Video as VideoIcon, 
   User as UserIcon, ShieldAlert, Clock, Check,
-  Settings, CheckSquare, Square
+  Settings, CheckSquare, Square, Filter, ChevronRight,
+  UserCheck, CalendarPlus, RotateCcw
 } from 'lucide-react';
 import { ConfirmationModal } from '../components/ConfirmationModal';
-import { CREATIVE_PLATFORMS, CREATIVE_MEDIUMS, DESIGNER_NAMES } from '../constants';
+import { CREATIVE_PLATFORMS, CREATIVE_MEDIUMS } from '../constants';
 
 export const CreativeStore: React.FC = () => {
   const [logs, setLogs] = useState<CreativeLog[]>([]);
   const [allSubOptions, setAllSubOptions] = useState<CreativeSubOption[]>([]);
+  const [designers, setDesigners] = useState<CreativeDesigner[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isIdentityModalOpen, setIsIdentityModalOpen] = useState(false);
   const [editingLog, setEditingLog] = useState<CreativeLog | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Date selection states
+  const today = new Date().toISOString().split('T')[0];
+  const [selectedDates, setSelectedDates] = useState<string[]>([today]);
+  const [tempPickedDate, setTempPickedDate] = useState('');
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const datePickerRef = useRef<HTMLDivElement>(null);
+
+  const [filterCreator, setFilterCreator] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [designerToDelete, setDesignerToDelete] = useState<CreativeDesigner | null>(null);
   const [isAddingOption, setIsAddingOption] = useState(false);
   const [newOptionName, setNewOptionName] = useState('');
+  const [newDesignerName, setNewDesignerName] = useState('');
+  
+  const [editingDesignerId, setEditingDesignerId] = useState<string | null>(null);
+  const [editingDesignerName, setEditingDesignerName] = useState('');
 
   const [formData, setFormData] = useState<Partial<CreativeLog>>({
-    date: new Date().toISOString().split('T')[0],
-    creator_name: DESIGNER_NAMES[0],
+    date: today,
+    creator_name: '',
     subject: '',
     platform: 'Social Media',
     medium: 'Digital Image',
@@ -39,19 +56,34 @@ export const CreativeStore: React.FC = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [data, opts, user] = await Promise.all([
+    const [data, opts, des, user] = await Promise.all([
       DBService.getCreativeLogs(),
       DBService.getCreativeSubOptions(),
+      DBService.getCreativeDesigners(),
       DBService.getCurrentUser()
     ]);
     setLogs(data);
     setAllSubOptions(opts);
+    setDesigners(des);
     setCurrentUser(user);
+    
+    if (des.length > 0 && !formData.creator_name) {
+      setFormData(prev => ({ ...prev, creator_name: des[0].name }));
+    }
+    
     setLoading(false);
   };
 
   useEffect(() => {
     fetchData();
+    
+    const handleClickOutside = (event: MouseEvent) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+        setIsDatePickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const role = currentUser?.role || 'Viewer';
@@ -64,7 +96,6 @@ export const CreativeStore: React.FC = () => {
   }, [allSubOptions, formData.platform]);
 
   useEffect(() => {
-    // If not editing, reset ticks when platform changes
     if (!editingLog) {
       setSelectedTicks([]);
       setFormData(prev => ({ ...prev, amount: 0 }));
@@ -77,10 +108,34 @@ export const CreativeStore: React.FC = () => {
         ? prev.filter(t => t !== optionName) 
         : [...prev, optionName];
       
-      // Auto-update quantity
       setFormData(f => ({ ...f, amount: next.length }));
       return next;
     });
+  };
+
+  // Helper to add manual date
+  const commitManualDate = () => {
+    if (!tempPickedDate) return;
+    setSelectedDates(prev => {
+      if (prev.includes(tempPickedDate)) return prev;
+      return [...prev, tempPickedDate].sort((a, b) => b.localeCompare(a));
+    });
+    setTempPickedDate('');
+  };
+
+  const removeDate = (date: string) => {
+    setSelectedDates(prev => prev.filter(d => d !== date));
+  };
+
+  // Presets logic
+  const setRangePreset = (days: number) => {
+    const dates = [];
+    for (let i = 0; i < days; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      dates.push(d.toISOString().split('T')[0]);
+    }
+    setSelectedDates(dates.sort((a, b) => b.localeCompare(a)));
   };
 
   const handleAddSubOption = async () => {
@@ -96,6 +151,41 @@ export const CreativeStore: React.FC = () => {
     setIsAddingOption(false);
   };
 
+  const handleAddDesigner = async () => {
+    if (!newDesignerName.trim() || !isAdmin) return;
+    const newDes: CreativeDesigner = {
+      id: `des-${Math.random().toString(36).substr(2, 9)}`,
+      name: newDesignerName.trim()
+    };
+    await DBService.saveCreativeDesigner(newDes);
+    setDesigners(prev => [...prev, newDes].sort((a, b) => a.name.localeCompare(b.name)));
+    setNewDesignerName('');
+  };
+
+  const startEditingDesigner = (designer: CreativeDesigner) => {
+    setEditingDesignerId(designer.id);
+    setEditingDesignerName(designer.name);
+  };
+
+  const handleUpdateDesigner = async () => {
+    if (!editingDesignerId || !editingDesignerName.trim() || !isAdmin) return;
+    const updated: CreativeDesigner = {
+      id: editingDesignerId,
+      name: editingDesignerName.trim()
+    };
+    await DBService.saveCreativeDesigner(updated);
+    setDesigners(prev => prev.map(d => d.id === editingDesignerId ? updated : d).sort((a, b) => a.name.localeCompare(b.name)));
+    setEditingDesignerId(null);
+    setEditingDesignerName('');
+  };
+
+  const confirmDeleteDesigner = async () => {
+    if (!isAdmin || !designerToDelete) return;
+    await DBService.deleteCreativeDesigner(designerToDelete.id);
+    setDesigners(prev => prev.filter(d => d.id !== designerToDelete.id));
+    setDesignerToDelete(null);
+  };
+
   const handleOpenModal = (log: CreativeLog | null = null) => {
     if (isViewer) return;
     if (log) {
@@ -106,8 +196,8 @@ export const CreativeStore: React.FC = () => {
       setEditingLog(null);
       setSelectedTicks([]);
       setFormData({
-        date: new Date().toISOString().split('T')[0],
-        creator_name: DESIGNER_NAMES[0],
+        date: today,
+        creator_name: designers.length > 0 ? designers[0].name : '',
         subject: '',
         platform: 'Social Media',
         medium: 'Digital Image',
@@ -141,12 +231,17 @@ export const CreativeStore: React.FC = () => {
   };
 
   const filteredLogs = useMemo(() => {
-    return logs.filter(l => 
-      l.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      l.creator_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      l.platform?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [logs, searchTerm]);
+    return logs.filter(l => {
+      const matchSearch = searchTerm === '' || 
+        l.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        l.platform?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchDate = selectedDates.length === 0 || selectedDates.includes(l.date);
+      const matchCreator = filterCreator === '' || l.creator_name === filterCreator;
+      
+      return matchSearch && matchDate && matchCreator;
+    });
+  }, [logs, searchTerm, selectedDates, filterCreator]);
 
   const stats = useMemo(() => {
     const totalItems = logs.reduce((acc, l) => acc + (Number(l.amount) || 0), 0);
@@ -174,11 +269,18 @@ export const CreativeStore: React.FC = () => {
             <p className="text-slate-500 font-semibold text-sm mt-1.5 leading-relaxed">Daily production ledger for designers and editors.</p>
           </div>
         </div>
-        {isEditor && (
-          <button onClick={() => handleOpenModal()} className="flex items-center gap-2 px-8 py-3.5 bg-[#2563eb] text-white rounded-2xl hover:bg-blue-700 font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-blue-100 active:scale-95">
-            <Plus size={18} strokeWidth={3} /> Log New Output
-          </button>
-        )}
+        <div className="flex items-center gap-4">
+           {isAdmin && (
+             <button onClick={() => setIsIdentityModalOpen(true)} className="flex items-center gap-2 px-6 py-3.5 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-slate-200 active:scale-95">
+               <UserCheck size={18} /> Manage Identities
+             </button>
+           )}
+           {isEditor && (
+             <button onClick={() => handleOpenModal()} className="flex items-center gap-2 px-8 py-3.5 bg-[#2563eb] text-white rounded-2xl hover:bg-blue-700 font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-blue-100 active:scale-95">
+               <Plus size={18} strokeWidth={3} /> Log New Output
+             </button>
+           )}
+        </div>
       </header>
 
       {isViewer && (
@@ -219,16 +321,127 @@ export const CreativeStore: React.FC = () => {
         </div>
       </div>
 
+      {/* Advanced Filter Console */}
+      <div className="bg-[#e2e8f0]/40 backdrop-blur-md p-2.5 rounded-full border border-white/40 shadow-sm flex items-center gap-4 transition-all hover:bg-[#e2e8f0]/60 mx-2">
+        <div className="relative flex-1 group">
+          <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-blue-500 transition-colors" size={18} />
+          <input 
+            type="text" 
+            placeholder="Search subjects or platforms..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-14 pr-6 py-3.5 bg-white border-none rounded-full outline-none focus:ring-0 text-sm font-medium text-slate-600 placeholder:text-slate-400 shadow-sm"
+          />
+        </div>
+
+        {/* Updated Multi-Date Picker with Presets */}
+        <div className="relative" ref={datePickerRef}>
+          <button 
+            onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
+            className="flex items-center gap-3 bg-white rounded-full px-5 py-3.5 shadow-sm min-w-[220px] hover:bg-slate-50 transition-colors"
+          >
+            <Calendar size={18} className="text-slate-400" />
+            <span className="text-xs font-bold text-slate-700 truncate max-w-[140px]">
+              {selectedDates.length === 0 ? "All Time" : 
+               selectedDates.length === 1 && selectedDates[0] === today ? "Today" :
+               selectedDates.length === 7 && selectedDates.includes(today) ? "Last 7 Days" :
+               `${selectedDates.length} Dates Active`}
+            </span>
+          </button>
+
+          {isDatePickerOpen && (
+            <div className="absolute top-full mt-3 right-0 w-80 bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 z-[100] animate-in slide-in-from-top-2">
+              <div className="space-y-6">
+                {/* Presets Row */}
+                <div className="space-y-3">
+                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Quick Ranges</p>
+                   <div className="grid grid-cols-4 gap-2">
+                      <button onClick={() => setSelectedDates([today])} className={`py-2 text-[10px] font-black rounded-xl border transition-all ${selectedDates.length === 1 && selectedDates[0] === today ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-100 text-slate-600 hover:border-blue-200'}`}>Today</button>
+                      <button onClick={() => setRangePreset(7)} className="py-2 bg-white border border-slate-100 text-slate-600 hover:border-blue-200 rounded-xl text-[10px] font-black transition-all">7D</button>
+                      <button onClick={() => setRangePreset(15)} className="py-2 bg-white border border-slate-100 text-slate-600 hover:border-blue-200 rounded-xl text-[10px] font-black transition-all">15D</button>
+                      <button onClick={() => setRangePreset(30)} className="py-2 bg-white border border-slate-100 text-slate-600 hover:border-blue-200 rounded-xl text-[10px] font-black transition-all">30D</button>
+                   </div>
+                </div>
+
+                {/* Manual Picker */}
+                <div className="space-y-3">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Manual Selection</p>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <CalendarPlus className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                      <input 
+                        type="date" 
+                        value={tempPickedDate}
+                        onChange={(e) => setTempPickedDate(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && commitManualDate()}
+                        className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none focus:border-blue-300 transition-all" 
+                      />
+                    </div>
+                    <button 
+                      onClick={commitManualDate}
+                      className="px-4 bg-blue-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-blue-700 active:scale-95 transition-all shadow-lg shadow-blue-100"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+
+                {/* Selected Tags */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between ml-1">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Active Pool</p>
+                    <button onClick={() => setSelectedDates([])} className="text-[9px] font-black text-red-500 uppercase tracking-widest hover:underline">Clear All</button>
+                  </div>
+                  <div className="max-h-[160px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                    {selectedDates.map(date => (
+                      <div key={date} className="flex items-center justify-between p-3 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 animate-in fade-in zoom-in-95">
+                        <span className="text-[11px] font-black tracking-tight">{date}</span>
+                        <button onClick={() => removeDate(date)} className="text-blue-300 hover:text-blue-600 transition-colors">
+                          <X size={14} strokeWidth={3} />
+                        </button>
+                      </div>
+                    ))}
+                    {selectedDates.length === 0 && (
+                      <p className="text-[10px] font-bold text-slate-300 italic text-center py-4">No specific dates selected. All logs visible.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3 bg-white rounded-full px-5 py-1.5 shadow-sm min-w-[200px]">
+           <UserIcon size={18} className="text-slate-400" />
+           <select 
+             value={filterCreator} 
+             onChange={(e) => setFilterCreator(e.target.value)} 
+             className="text-xs font-bold text-slate-700 outline-none bg-transparent border-none py-2 pr-8 cursor-pointer w-full focus:ring-0"
+           >
+             <option value="">All Identities</option>
+             {designers.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+           </select>
+        </div>
+      </div>
+
       <div className="bg-white rounded-[3rem] border border-slate-100 shadow-2xl shadow-slate-200/40 overflow-hidden">
         <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
-           <div className="relative">
-              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search creator or subject..." className="pl-12 pr-6 py-3 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/5 text-sm font-bold w-80" />
-           </div>
            <div className="flex items-center gap-2">
               <Clock size={16} className="text-slate-300" />
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Real-time Production Feed</span>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Production Feed ({filteredLogs.length} Records)</span>
            </div>
+           {(searchTerm || selectedDates.length > 0 || filterCreator) && (
+             <button 
+              onClick={() => { 
+                setSearchTerm(''); 
+                setSelectedDates([today]); 
+                setFilterCreator(''); 
+              }} 
+              className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline flex items-center gap-2"
+             >
+               <RotateCcw size={12} /> Reset View
+             </button>
+           )}
         </div>
 
         <div className="overflow-x-auto">
@@ -256,7 +469,7 @@ export const CreativeStore: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-8 py-8 max-w-xs">
-                    <p className="text-[11px] font-bold text-slate-700 leading-snug">{log.subject}</p>
+                    <p className="text-[11px] font-bold text-slate-700 leading-snug leading-tight">{log.subject}</p>
                     {log.selected_options && (
                       <div className="flex flex-wrap gap-1 mt-1.5">
                         {log.selected_options.split(', ').map((opt, i) => (
@@ -270,7 +483,7 @@ export const CreativeStore: React.FC = () => {
                     <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase inline-block ${
                       log.medium === 'Video' ? 'bg-purple-50 text-purple-600 border border-purple-100' :
                       log.medium === 'Physical Image' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
-                      'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                      'bg-emerald-50 text-emerald-600 border-emerald-100'
                     }`}>
                       {log.medium}
                     </span>
@@ -290,8 +503,8 @@ export const CreativeStore: React.FC = () => {
                 <tr>
                   <td colSpan={6} className="px-8 py-20 text-center">
                      <div className="flex flex-col items-center gap-4 opacity-30">
-                        <Paintbrush size={48} />
-                        <p className="text-sm font-black uppercase tracking-widest">No production logs found</p>
+                        <Search size={48} />
+                        <p className="text-sm font-black uppercase tracking-widest">No production logs found for active filters</p>
                      </div>
                   </td>
                 </tr>
@@ -300,6 +513,101 @@ export const CreativeStore: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Identity Management Modal */}
+      {isIdentityModalOpen && isAdmin && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
+          <div className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in-95">
+             <div className="p-10 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
+                <div className="flex items-center gap-4">
+                   <div className="w-14 h-14 bg-slate-900 rounded-3xl flex items-center justify-center text-white shadow-xl shadow-slate-200"><UserCheck size={28}/></div>
+                   <h3 className="text-2xl font-black text-slate-900 tracking-tight">Identity Registry</h3>
+                </div>
+                <button onClick={() => setIsIdentityModalOpen(false)} className="w-12 h-12 flex items-center justify-center bg-white border border-slate-100 rounded-full text-slate-300 hover:text-slate-900 transition-all"><X size={24}/></button>
+             </div>
+             <div className="p-10 space-y-8">
+                <div className="space-y-4">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2.5 block ml-1">Add New Producer Identity</label>
+                   <div className="flex gap-2">
+                      <input 
+                        value={newDesignerName} 
+                        onChange={e => setNewDesignerName(e.target.value)} 
+                        className="flex-1 px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-500/5 transition-all" 
+                        placeholder="Designer or Editor Name"
+                      />
+                      <button 
+                        onClick={handleAddDesigner}
+                        className="px-6 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-100"
+                      >
+                        Add
+                      </button>
+                   </div>
+                </div>
+                
+                <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+                   {designers.map(d => (
+                     <div key={d.id} className="p-4 bg-white border border-slate-100 rounded-2xl flex items-center justify-between group hover:border-blue-200 transition-all">
+                        <div className="flex items-center gap-3 flex-1">
+                           <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center text-slate-400 group-hover:text-blue-600 transition-all"><UserIcon size={14}/></div>
+                           {editingDesignerId === d.id ? (
+                             <input 
+                               autoFocus
+                               value={editingDesignerName}
+                               onChange={(e) => setEditingDesignerName(e.target.value)}
+                               className="text-sm font-black text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 outline-none w-full"
+                               onKeyDown={(e) => e.key === 'Enter' && handleUpdateDesigner()}
+                             />
+                           ) : (
+                             <span className="text-sm font-black text-slate-700">{d.name}</span>
+                           )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                           {editingDesignerId === d.id ? (
+                             <>
+                               <button 
+                                 onClick={handleUpdateDesigner}
+                                 className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
+                                 title="Save Rename"
+                               >
+                                 <Check size={16} strokeWidth={3}/>
+                               </button>
+                               <button 
+                                 onClick={() => setEditingDesignerId(null)}
+                                 className="p-2 text-slate-400 hover:bg-slate-50 rounded-lg transition-all"
+                                 title="Cancel"
+                               >
+                                 <X size={16}/>
+                               </button>
+                             </>
+                           ) : (
+                             <>
+                               <button 
+                                 onClick={() => startEditingDesigner(d)}
+                                 className="p-2 text-slate-200 hover:text-blue-500 transition-all hover:bg-blue-50 rounded-lg"
+                                 title="Rename Identity"
+                               >
+                                 <Edit2 size={16}/>
+                               </button>
+                               <button 
+                                 onClick={() => setDesignerToDelete(d)}
+                                 className="p-2 text-slate-200 hover:text-red-500 transition-all hover:bg-red-50 rounded-lg"
+                                 title="Remove Identity"
+                               >
+                                 <Trash2 size={16}/>
+                               </button>
+                             </>
+                           )}
+                        </div>
+                     </div>
+                   ))}
+                </div>
+             </div>
+             <div className="p-8 border-t border-slate-50 bg-slate-50/20 text-center">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Changes take effect immediately for all entry forms.</p>
+             </div>
+          </div>
+        </div>
+      )}
 
       {isModalOpen && isEditor && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-md animate-in fade-in">
@@ -320,7 +628,8 @@ export const CreativeStore: React.FC = () => {
                 <div>
                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2.5 block ml-1">Creative Identity</label>
                    <select value={formData.creator_name} onChange={e => setFormData(p => ({ ...p, creator_name: e.target.value }))} className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-sm outline-none">
-                     {DESIGNER_NAMES.map(name => <option key={name} value={name}>{name}</option>)}
+                     {designers.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                     {designers.length === 0 && <option value="">No Identities Defined</option>}
                    </select>
                 </div>
                 <div className="col-span-2">
@@ -340,7 +649,6 @@ export const CreativeStore: React.FC = () => {
                    </select>
                 </div>
 
-                {/* Dynamic Tick Marks Section */}
                 <div className="col-span-2 space-y-6 pt-4 border-t border-slate-50">
                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -443,6 +751,15 @@ export const CreativeStore: React.FC = () => {
         message="Are you certain you want to remove this record from the production history? This action is permanent."
         onConfirm={handleDelete}
         onCancel={() => setDeleteConfirmId(null)}
+      />
+
+      <ConfirmationModal 
+        isOpen={!!designerToDelete}
+        title="Remove Producer Identity?"
+        message={`Are you certain you want to remove "${designerToDelete?.name}" from the identity registry? Past production logs will remain, but this identity will no longer be available for new logs.`}
+        onConfirm={confirmDeleteDesigner}
+        onCancel={() => setDesignerToDelete(null)}
+        confirmText="Remove Identity"
       />
     </div>
   );

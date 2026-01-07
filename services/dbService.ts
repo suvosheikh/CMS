@@ -1,5 +1,5 @@
 
-import { PostLog, Category, User, Role, Campaign, AdCampaignEntry, Feedback, CreativeLog, CreativeSubOption } from '../types';
+import { PostLog, Category, User, Role, Campaign, AdCampaignEntry, Feedback, CreativeLog, CreativeSubOption, CreativeDesigner } from '../types';
 import { supabase } from './supabase';
 
 const STORAGE_KEYS = {
@@ -106,6 +106,26 @@ export class DBService {
   static async deleteCreativeSubOption(id: string): Promise<void> {
     if (this.isSupabaseConfigured()) {
       await supabase.from('creative_sub_options').delete().eq('id', id);
+    }
+  }
+
+  static async getCreativeDesigners(): Promise<CreativeDesigner[]> {
+    if (this.isSupabaseConfigured()) {
+      const { data } = await supabase.from('creative_designers').select('*').order('name');
+      return (data as CreativeDesigner[]) || [];
+    }
+    return [];
+  }
+
+  static async saveCreativeDesigner(designer: CreativeDesigner): Promise<void> {
+    if (this.isSupabaseConfigured()) {
+      await supabase.from('creative_designers').upsert(designer);
+    }
+  }
+
+  static async deleteCreativeDesigner(id: string): Promise<void> {
+    if (this.isSupabaseConfigured()) {
+      await supabase.from('creative_designers').delete().eq('id', id);
     }
   }
 

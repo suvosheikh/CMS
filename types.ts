@@ -73,6 +73,11 @@ export interface PostLog {
   asset_link?: string;
 }
 
+export interface CreativeDesigner {
+  id: string;
+  name: string;
+}
+
 export type CreativePlatform = 
   | 'Branch' 
   | 'Social Media' 
