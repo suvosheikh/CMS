@@ -53,7 +53,16 @@ export const Entry: React.FC = () => {
 
   const addModel = () => {
     if (!tempModel.trim() || isViewer) return;
-    setUiModels(prev => [...prev, tempModel.trim()]);
+    
+    // Split by comma, trim whitespace, remove empty entries, and prevent duplicates
+    const incomingModels = tempModel
+      .split(',')
+      .map(m => m.trim())
+      .filter(m => m !== '' && !uiModels.includes(m));
+    
+    if (incomingModels.length > 0) {
+      setUiModels(prev => [...prev, ...incomingModels]);
+    }
     setTempModel('');
   };
 
@@ -225,7 +234,7 @@ export const Entry: React.FC = () => {
                       onChange={(e) => setTempModel(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addModel())}
                       className={inputClass} 
-                      placeholder="e.g. ASUS TUF F15 (Enter to add)" 
+                      placeholder="e.g. ASUS TUF F15, Katana 15 (Enter to add)" 
                     />
                     <button 
                       type="button"
@@ -235,6 +244,9 @@ export const Entry: React.FC = () => {
                       <Plus size={20} />
                     </button>
                   </div>
+                  <p className="text-[10px] font-bold text-slate-400 mt-2.5 ml-1 italic">
+                    Tip: Separate multiple models with commas to add in bulk.
+                  </p>
                   <div className="flex flex-wrap gap-2.5 mt-4 min-h-[44px]">
                     {uiModels.map((m, idx) => (
                       <div key={idx} className="flex items-center gap-2 bg-blue-50 text-blue-700 border border-blue-100 px-4 py-2 rounded-2xl animate-in zoom-in-90">

@@ -1,5 +1,5 @@
 
-import { PostLog, Category, User, Role, Campaign, AdCampaignEntry, Feedback } from '../types';
+import { PostLog, Category, User, Role, Campaign, AdCampaignEntry, Feedback, CreativeLog, CreativeSubOption } from '../types';
 import { supabase } from './supabase';
 
 const STORAGE_KEYS = {
@@ -62,6 +62,50 @@ export class DBService {
   static async deletePost(id: string): Promise<void> {
     if (this.isSupabaseConfigured()) {
       await supabase.from('posts').delete().eq('id', id);
+    }
+  }
+
+  // --- CREATIVE STORE ---
+  static async getCreativeLogs(): Promise<CreativeLog[]> {
+    if (this.isSupabaseConfigured()) {
+      const { data } = await supabase
+        .from('creative_logs')
+        .select('*')
+        .order('date', { ascending: false });
+      return (data as CreativeLog[]) || [];
+    }
+    return [];
+  }
+
+  static async saveCreativeLog(log: CreativeLog): Promise<void> {
+    if (this.isSupabaseConfigured()) {
+      await supabase.from('creative_logs').upsert(log);
+    }
+  }
+
+  static async deleteCreativeLog(id: string): Promise<void> {
+    if (this.isSupabaseConfigured()) {
+      await supabase.from('creative_logs').delete().eq('id', id);
+    }
+  }
+
+  static async getCreativeSubOptions(): Promise<CreativeSubOption[]> {
+    if (this.isSupabaseConfigured()) {
+      const { data } = await supabase.from('creative_sub_options').select('*');
+      return (data as CreativeSubOption[]) || [];
+    }
+    return [];
+  }
+
+  static async saveCreativeSubOption(option: CreativeSubOption): Promise<void> {
+    if (this.isSupabaseConfigured()) {
+      await supabase.from('creative_sub_options').upsert(option);
+    }
+  }
+
+  static async deleteCreativeSubOption(id: string): Promise<void> {
+    if (this.isSupabaseConfigured()) {
+      await supabase.from('creative_sub_options').delete().eq('id', id);
     }
   }
 

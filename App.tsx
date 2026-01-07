@@ -12,6 +12,7 @@ import { Profile } from './pages/Profile';
 import { AdsCampaign } from './pages/AdsCampaign';
 import { AdDetails } from './pages/AdDetails';
 import { Reports } from './pages/Reports';
+import { CreativeStore } from './pages/CreativeStore';
 import { DBService } from './services/dbService';
 import { User } from './types';
 import { LogIn, ShieldCheck, Lock, User as UserIcon, AlertCircle } from 'lucide-react';
@@ -129,6 +130,7 @@ const App: React.FC = () => {
                 <Route path="/campaigns" element={<Reports />} />
                 <Route path="/ads" element={<AdsCampaign />} />
                 <Route path="/ads/:id" element={<AdDetails />} />
+                <Route path="/creative-store" element={<CreativeStore />} />
                 <Route path="/users" element={<UserManagement />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="*" element={<Navigate to="/" replace />} />

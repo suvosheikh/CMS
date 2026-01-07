@@ -12,7 +12,7 @@ import {
   User as UserIcon,
   Megaphone,
   BarChart3,
-  Settings
+  Paintbrush
 } from 'lucide-react';
 import { DBService } from '../services/dbService';
 import { User } from '../types';
@@ -61,24 +61,26 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, isNew }) => {
 
 export const Sidebar: React.FC<{ onLogout?: () => void }> = ({ onLogout }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [counts, setCounts] = useState({ posts: 0, categories: 0, ads: 0, users: 0 });
+  const [counts, setCounts] = useState({ posts: 0, categories: 0, ads: 0, users: 0, creatives: 0 });
   const location = useLocation();
 
   useEffect(() => {
     const fetchData = async () => {
-      const [user, posts, cats, adCamps, users] = await Promise.all([
+      const [user, posts, cats, adCamps, users, creatives] = await Promise.all([
         DBService.getCurrentUser(), 
         DBService.getPosts(), 
         DBService.getCategories(),
         DBService.getAdsCampaigns(),
-        DBService.getUsers()
+        DBService.getUsers(),
+        DBService.getCreativeLogs()
       ]);
       setCurrentUser(user);
       setCounts({
         posts: posts.length,
         categories: cats.length,
         ads: adCamps.length,
-        users: users.length
+        users: users.length,
+        creatives: creatives.length
       });
     };
     fetchData();
@@ -103,6 +105,7 @@ export const Sidebar: React.FC<{ onLogout?: () => void }> = ({ onLogout }) => {
         <NavItem to="/categories" icon={<FolderTree size={18} />} label="Categories" badge={counts.categories} />
         <NavItem to="/campaigns" icon={<BarChart3 size={18} />} label="Reports" />
         <NavItem to="/ads" icon={<Megaphone size={18} />} label="Ads Campaign" badge={counts.ads} />
+        <NavItem to="/creative-store" icon={<Paintbrush size={18} />} label="Creative Store" badge={counts.creatives} />
         <NavItem to="/users" icon={<Users size={18} />} label="User Access" badge={counts.users} />
       </nav>
 

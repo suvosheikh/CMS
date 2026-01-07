@@ -63,14 +63,45 @@ export interface PostLog {
   main_category_id: string;
   sub_category_id: string;
   brand_type_id?: string;
-  product_model: string; // The primary string stored in DB
-  productModels?: string[]; // UI helper array
+  product_model: string; 
+  productModels?: string[]; 
   content_type: ContentType;
   content_tag: ContentTag;
   campaign_name?: string;
   status: PostStatus;
   notes?: string;
   asset_link?: string;
+}
+
+export type CreativePlatform = 
+  | 'Branch' 
+  | 'Social Media' 
+  | 'Ads' 
+  | 'Website' 
+  | 'Website Offer' 
+  | 'Thumbnail' 
+  | 'Print' 
+  | 'TV Content' 
+  | 'Others';
+
+export type CreativeMedium = 'Digital Image' | 'Physical Image' | 'Video';
+
+export interface CreativeLog {
+  id: string;
+  date: string;
+  creator_name: string;
+  subject: string;
+  platform: CreativePlatform;
+  medium: CreativeMedium;
+  amount: number;
+  selected_options?: string;
+  created_at?: string;
+}
+
+export interface CreativeSubOption {
+  id: string;
+  platform: CreativePlatform;
+  name: string;
 }
 
 export type FeedbackType = 'Revision' | 'Design' | 'Caption' | 'General';
