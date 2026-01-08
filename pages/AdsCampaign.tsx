@@ -9,8 +9,7 @@ import {
   Calendar, DollarSign, Activity, Flag,
   ShieldAlert, Globe, PlayCircle, PauseCircle, Clock,
   BarChart3, LayoutList, Target, TrendingUp, AlertCircle,
-  // Added Info icon to fix the missing import error
-  Info
+  Info, RotateCcw, Filter
 } from 'lucide-react';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 
@@ -21,6 +20,11 @@ export const AdsCampaign: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCamp, setEditingCamp] = useState<AdCampaignEntry | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Default to Present Year (e.g., "2025")
+  const currentYear = new Date().getFullYear().toString();
+  const [filterMonth, setFilterMonth] = useState(currentYear);
+  
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const today = new Date().toISOString().split('T')[0];
@@ -112,7 +116,6 @@ export const AdsCampaign: React.FC = () => {
     e.preventDefault();
     if (isViewer) return;
 
-    // Auto-calculate final values
     const currentDuration = getDuration(formData);
     const results = parseInt(formData.result || '0');
     const cpr = results > 0 ? (Number(formData.spend) / results) : 0;
@@ -121,7 +124,6 @@ export const AdsCampaign: React.FC = () => {
       ...formData,
       planned_duration: currentDuration,
       cost_per_result: Number(cpr.toFixed(2)),
-      // If status is planned, reset spend to 0 just in case
       spend: formData.status === 'Planned' ? 0 : Number(formData.spend),
       id: editingCamp ? editingCamp.id : `C-${Math.floor(1000 + Math.random() * 9000)}`,
     } as AdCampaignEntry;
@@ -138,22 +140,30 @@ export const AdsCampaign: React.FC = () => {
     fetchData();
   };
 
+  // Filter Logic: Defaults to Year, narrows to Month if selected
   const filteredCampaigns = useMemo(() => {
-    return campaigns.filter(c => 
-      c.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.platform?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [campaigns, searchTerm]);
+    return campaigns.filter(c => {
+      const matchSearch = searchTerm === '' || 
+        c.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.platform?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchMonth = !filterMonth || (c.start_date && c.start_date.startsWith(filterMonth));
+      
+      return matchSearch && matchMonth;
+    });
+  }, [campaigns, searchTerm, filterMonth]);
 
   const stats = useMemo(() => {
-    const totalSpend = campaigns.reduce((acc, c) => acc + (Number(c.spend) || 0), 0);
-    const activeCount = campaigns.filter(c => c.status === 'Active').length;
-    const completedCount = campaigns.filter(c => c.status === 'Completed').length;
-    return { totalSpend, activeCount, completedCount, total: campaigns.length };
-  }, [campaigns]);
+    const totalSpend = filteredCampaigns.reduce((acc, c) => acc + (Number(c.spend) || 0), 0);
+    const activeCount = filteredCampaigns.filter(c => c.status === 'Active').length;
+    const completedCount = filteredCampaigns.filter(c => c.status === 'Completed').length;
+    return { totalSpend, activeCount, completedCount, total: filteredCampaigns.length };
+  }, [filteredCampaigns]);
 
   const inputClass = "w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 outline-none font-bold text-[13px] text-slate-700 transition-all";
   const labelClass = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2.5 block ml-1";
+
+  const isFullYearView = filterMonth.length === 4;
 
   return (
     <div className="space-y-10 pb-20 animate-in fade-in duration-700">
@@ -162,7 +172,9 @@ export const AdsCampaign: React.FC = () => {
           <div className="w-11 h-11 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-blue-600 shadow-sm"><Megaphone size={22} /></div>
           <div className="flex flex-col text-left">
             <h1 className="text-4xl font-black text-[#0f172a] tracking-tighter leading-none">Ads Campaign</h1>
-            <p className="text-slate-500 font-semibold text-sm mt-1.5 leading-relaxed">Systematic lifecycle tracking from Planning to Completion.</p>
+            <p className="text-slate-500 font-semibold text-sm mt-1.5 leading-relaxed">
+              Tracking performance for <span className="text-blue-600 font-black">{isFullYearView ? `Year ${filterMonth}` : `Period ${filterMonth}`}</span>.
+            </p>
           </div>
         </div>
         {isEditor && (
@@ -172,12 +184,12 @@ export const AdsCampaign: React.FC = () => {
         )}
       </header>
 
-      {/* Campaign Dashboard */}
+      {/* Campaign Dashboard - Dynamic stats based on the Year/Month filter */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 px-2">
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6 group hover:border-emerald-200 transition-all">
            <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-all"><DollarSign size={24} /></div>
            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Spend</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{isFullYearView ? 'Yearly Spend' : 'Monthly Spend'}</p>
               <p className="text-3xl font-black text-slate-900 tracking-tighter">${stats.totalSpend.toLocaleString()}</p>
            </div>
         </div>
@@ -198,17 +210,44 @@ export const AdsCampaign: React.FC = () => {
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6 group hover:border-slate-200 transition-all">
            <div className="w-14 h-14 bg-slate-50 text-slate-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-all"><Flag size={24} /></div>
            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Ads</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Period Total</p>
               <p className="text-3xl font-black text-slate-900 tracking-tighter">{stats.total}</p>
            </div>
         </div>
       </div>
 
       <div className="bg-white rounded-[3rem] border border-slate-100 shadow-2xl shadow-slate-200/40 overflow-hidden mx-2">
-        <div className="p-8 border-b border-slate-50 bg-slate-50/30">
-           <div className="relative group max-w-md">
+        {/* Filter Bar */}
+        <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex flex-wrap items-center gap-6">
+           <div className="relative group flex-1 max-w-md">
               <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-blue-500 transition-colors" />
-              <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search Campaign Subject..." className="w-full pl-12 pr-6 py-3.5 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/5 text-sm font-bold shadow-sm" />
+              <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search Campaign Subject..." className="w-full pl-12 pr-6 py-4 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/5 text-sm font-bold shadow-sm" />
+           </div>
+
+           <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-5 py-3 shadow-sm transition-all hover:border-blue-200">
+                <div className="flex items-center gap-2 pr-3 border-r border-slate-100">
+                   <Filter size={14} className="text-blue-500" />
+                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                     {isFullYearView ? 'Full Year' : 'Monthly'}
+                   </span>
+                </div>
+                <Calendar size={18} className="text-slate-400" />
+                <input 
+                  type="month" 
+                  value={isFullYearView ? '' : filterMonth} 
+                  onChange={(e) => setFilterMonth(e.target.value)}
+                  className="text-sm font-bold text-slate-700 outline-none bg-transparent cursor-pointer"
+                />
+                {!isFullYearView && (
+                  <button 
+                    onClick={() => setFilterMonth(currentYear)} 
+                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-100 transition-all ml-2"
+                  >
+                    <RotateCcw size={12} /> This Year
+                  </button>
+                )}
+              </div>
            </div>
         </div>
 
@@ -270,9 +309,11 @@ export const AdsCampaign: React.FC = () => {
               ))}
               {filteredCampaigns.length === 0 && (
                 <tr>
-                   <td colSpan={7} className="px-8 py-20 text-center opacity-30">
-                      <LayoutList size={40} className="mx-auto mb-4" />
-                      <p className="text-[10px] font-black uppercase tracking-widest">Zero Ad Registries Detected</p>
+                   <td colSpan={7} className="px-8 py-24 text-center">
+                      <div className="flex flex-col items-center gap-4 opacity-20">
+                         <LayoutList size={48} />
+                         <p className="text-xs font-black uppercase tracking-[0.3em]">No records found for {isFullYearView ? `Year ${filterMonth}` : `Month ${filterMonth}`}</p>
+                      </div>
                    </td>
                 </tr>
               )}
@@ -289,14 +330,13 @@ export const AdsCampaign: React.FC = () => {
                   <div className="w-14 h-14 bg-blue-600 rounded-3xl flex items-center justify-center text-white shadow-2xl shadow-blue-100"><Megaphone size={28}/></div>
                   <div>
                     <h3 className="text-2xl font-black text-slate-900 tracking-tight">{editingCamp ? 'Transition Lifecycle' : 'Initial Planning'}</h3>
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Current State: {formData.status}</p>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Status: {formData.status}</p>
                   </div>
                </div>
                <button onClick={() => setIsModalOpen(false)} className="w-12 h-12 flex items-center justify-center bg-white border border-slate-100 rounded-full text-slate-300 hover:text-slate-900 transition-all"><X size={24}/></button>
             </div>
             
             <form onSubmit={handleSave} className="p-10 space-y-10 overflow-y-auto max-h-[75vh]">
-              {/* Mandatory Info */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                  <div>
                     <label className={labelClass}>Operating Status</label>
@@ -349,7 +389,6 @@ export const AdsCampaign: React.FC = () => {
                  </div>
               </div>
 
-              {/* Scheduling (Visible always, label changes based on status) */}
               <div className="space-y-6 pt-8 border-t border-slate-50">
                  <div className="flex items-center gap-3">
                     <Calendar size={14} className="text-blue-600" />
@@ -390,7 +429,6 @@ export const AdsCampaign: React.FC = () => {
                  </div>
               </div>
 
-              {/* Performance Metrics (ONLY for Active, Paused, Completed) */}
               {formData.status !== 'Planned' && (
                 <div className="space-y-6 pt-8 border-t border-slate-50 animate-in slide-in-from-top-4">
                    <div className="flex items-center gap-3">
