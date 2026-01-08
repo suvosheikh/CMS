@@ -5,9 +5,12 @@ import { DBService } from '../services/dbService';
 import { AdCampaignEntry, AdStatus, User } from '../types';
 import { 
   Megaphone, Plus, Trash2, Edit2, X, Save, 
-  Search, LayoutList, Eye, Info, CheckCircle2,
-  Calendar, TrendingUp, DollarSign, Activity, Flag,
-  Clock, ShieldAlert
+  Search, Eye, CheckCircle2,
+  Calendar, DollarSign, Activity, Flag,
+  ShieldAlert, Globe, PlayCircle, PauseCircle, Clock,
+  BarChart3, LayoutList, Target, TrendingUp, AlertCircle,
+  // Added Info icon to fix the missing import error
+  Info
 } from 'lucide-react';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 
@@ -20,20 +23,20 @@ export const AdsCampaign: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
+  const today = new Date().toISOString().split('T')[0];
+
   const [formData, setFormData] = useState<Partial<AdCampaignEntry>>({
     platform: 'Meta',
     subject: '',
     media_type: 'Image',
     primary_kpi: 'Traffic',
-    planned_duration: 0,
     total_budget: 0,
     spend: 0,
     status: 'Planned',
-    start_date: '',
+    start_date: today,
     end_date: '',
     paused_date: '',
-    result: '',
-    cost_per_result: 0,
+    result: '0',
     impression: 0,
     reach: 0,
     other_effects: ''
@@ -59,15 +62,23 @@ export const AdsCampaign: React.FC = () => {
   const isEditor = role === 'Editor' || isAdmin;
   const isViewer = role === 'Viewer';
 
-  const calculateDuration = (ad: Partial<AdCampaignEntry> | AdCampaignEntry) => {
+  // Duration Calculation Logic
+  const getDuration = (ad: Partial<AdCampaignEntry>) => {
     if (!ad.start_date) return 0;
     const start = new Date(ad.start_date);
     let end = new Date();
-    if (ad.status === 'Completed' && ad.end_date) end = new Date(ad.end_date);
-    else if (ad.status === 'Paused' && ad.paused_date) end = new Date(ad.paused_date);
-    else if (ad.status === 'Planned' && ad.end_date) end = new Date(ad.end_date);
+
+    if (ad.status === 'Completed' && ad.end_date) {
+      end = new Date(ad.end_date);
+    } else if (ad.status === 'Paused' && ad.paused_date) {
+      end = new Date(ad.paused_date);
+    } else if (ad.status === 'Planned' && ad.end_date) {
+      end = new Date(ad.end_date);
+    }
+
     const diffTime = end.getTime() - start.getTime();
-    return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.max(0, days);
   };
 
   const handleOpenModal = (camp: AdCampaignEntry | null = null) => {
@@ -78,10 +89,20 @@ export const AdsCampaign: React.FC = () => {
     } else {
       setEditingCamp(null);
       setFormData({
-        platform: 'Meta', subject: '', media_type: 'Image', primary_kpi: 'Traffic',
-        planned_duration: 0, total_budget: 0, spend: 0, status: 'Planned',
-        start_date: '', end_date: '', paused_date: '', result: '',
-        cost_per_result: 0, impression: 0, reach: 0, other_effects: ''
+        platform: 'Meta',
+        subject: '',
+        media_type: 'Image',
+        primary_kpi: 'Traffic',
+        total_budget: 0,
+        spend: 0,
+        status: 'Planned',
+        start_date: today,
+        end_date: '',
+        paused_date: '',
+        result: '0',
+        impression: 0,
+        reach: 0,
+        other_effects: ''
       });
     }
     setIsModalOpen(true);
@@ -90,10 +111,18 @@ export const AdsCampaign: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isViewer) return;
-    const duration = calculateDuration(formData);
+
+    // Auto-calculate final values
+    const currentDuration = getDuration(formData);
+    const results = parseInt(formData.result || '0');
+    const cpr = results > 0 ? (Number(formData.spend) / results) : 0;
+
     const camp: AdCampaignEntry = {
       ...formData,
-      planned_duration: duration,
+      planned_duration: currentDuration,
+      cost_per_result: Number(cpr.toFixed(2)),
+      // If status is planned, reset spend to 0 just in case
+      spend: formData.status === 'Planned' ? 0 : Number(formData.spend),
       id: editingCamp ? editingCamp.id : `C-${Math.floor(1000 + Math.random() * 9000)}`,
     } as AdCampaignEntry;
 
@@ -109,15 +138,6 @@ export const AdsCampaign: React.FC = () => {
     fetchData();
   };
 
-  const getStatusStyle = (status: AdStatus) => {
-    switch (status) {
-      case 'Completed': return 'bg-emerald-600 text-white border-emerald-700';
-      case 'Active': return 'bg-blue-600 text-white border-blue-700';
-      case 'Paused': return 'bg-amber-500 text-white border-amber-600';
-      default: return 'bg-slate-400 text-white border-slate-500';
-    }
-  };
-
   const filteredCampaigns = useMemo(() => {
     return campaigns.filter(c => 
       c.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -125,19 +145,15 @@ export const AdsCampaign: React.FC = () => {
     );
   }, [campaigns, searchTerm]);
 
-  const dashboardStats = useMemo(() => {
+  const stats = useMemo(() => {
     const totalSpend = campaigns.reduce((acc, c) => acc + (Number(c.spend) || 0), 0);
     const activeCount = campaigns.filter(c => c.status === 'Active').length;
     const completedCount = campaigns.filter(c => c.status === 'Completed').length;
-    return { totalSpend, activeCount, completedCount, totalCampaigns: campaigns.length };
+    return { totalSpend, activeCount, completedCount, total: campaigns.length };
   }, [campaigns]);
 
-  if (loading) return (
-    <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4">
-      <div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aggregating Matrix...</p>
-    </div>
-  );
+  const inputClass = "w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 outline-none font-bold text-[13px] text-slate-700 transition-all";
+  const labelClass = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2.5 block ml-1";
 
   return (
     <div className="space-y-10 pb-20 animate-in fade-in duration-700">
@@ -145,62 +161,54 @@ export const AdsCampaign: React.FC = () => {
         <div className="flex items-center gap-5">
           <div className="w-11 h-11 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-blue-600 shadow-sm"><Megaphone size={22} /></div>
           <div className="flex flex-col text-left">
-            <h1 className="text-4xl font-black text-[#0f172a] tracking-tighter leading-none">Ads Management</h1>
-            <p className="text-slate-500 font-semibold text-sm mt-1.5 leading-relaxed">Lifecycle reporting across Channel Hubs.</p>
+            <h1 className="text-4xl font-black text-[#0f172a] tracking-tighter leading-none">Ads Campaign</h1>
+            <p className="text-slate-500 font-semibold text-sm mt-1.5 leading-relaxed">Systematic lifecycle tracking from Planning to Completion.</p>
           </div>
         </div>
         {isEditor && (
           <button onClick={() => handleOpenModal()} className="flex items-center gap-2 px-8 py-3.5 bg-[#2563eb] text-white rounded-2xl hover:bg-blue-700 font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-blue-100 active:scale-95">
-            <Plus size={18} strokeWidth={3} /> New Ad Registry
+            <Plus size={18} strokeWidth={3} /> Initialize Ad
           </button>
         )}
       </header>
 
-      {isViewer && (
-        <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl flex items-center gap-3 text-blue-700 mx-2">
-          <ShieldAlert size={18} />
-          <p className="text-[11px] font-black uppercase tracking-widest">Protected Insight View Only</p>
-        </div>
-      )}
-
+      {/* Campaign Dashboard */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 px-2">
-        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6">
-           <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center"><DollarSign size={24} /></div>
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6 group hover:border-emerald-200 transition-all">
+           <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-all"><DollarSign size={24} /></div>
            <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Spend</p>
-              <p className="text-3xl font-black text-slate-900 tracking-tighter">${dashboardStats.totalSpend.toLocaleString()}</p>
+              <p className="text-3xl font-black text-slate-900 tracking-tighter">${stats.totalSpend.toLocaleString()}</p>
            </div>
         </div>
-        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6">
-           <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center"><Activity size={24} /></div>
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6 group hover:border-blue-200 transition-all">
+           <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-all"><Activity size={24} /></div>
            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Active Ads</p>
-              <p className="text-3xl font-black text-slate-900 tracking-tighter">{dashboardStats.activeCount}</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Active</p>
+              <p className="text-3xl font-black text-slate-900 tracking-tighter">{stats.activeCount}</p>
            </div>
         </div>
-        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6">
-           <div className="w-14 h-14 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center"><CheckCircle2 size={24} /></div>
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6 group hover:border-purple-200 transition-all">
+           <div className="w-14 h-14 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-all"><CheckCircle2 size={24} /></div>
            <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Completed</p>
-              <p className="text-3xl font-black text-slate-900 tracking-tighter">{dashboardStats.completedCount}</p>
+              <p className="text-3xl font-black text-slate-900 tracking-tighter">{stats.completedCount}</p>
            </div>
         </div>
-        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6">
-           <div className="w-14 h-14 bg-slate-100 text-slate-600 rounded-2xl flex items-center justify-center"><Flag size={24} /></div>
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6 group hover:border-slate-200 transition-all">
+           <div className="w-14 h-14 bg-slate-50 text-slate-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-all"><Flag size={24} /></div>
            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Registry</p>
-              <p className="text-3xl font-black text-slate-900 tracking-tighter">{dashboardStats.totalCampaigns}</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Ads</p>
+              <p className="text-3xl font-black text-slate-900 tracking-tighter">{stats.total}</p>
            </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-[3rem] border border-slate-100 shadow-2xl shadow-slate-200/40 overflow-hidden">
-        <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
-           <div className="flex items-center gap-4">
-              <div className="relative">
-                 <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                 <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search Subject..." className="pl-12 pr-6 py-3 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/5 text-sm font-bold w-72" />
-              </div>
+      <div className="bg-white rounded-[3rem] border border-slate-100 shadow-2xl shadow-slate-200/40 overflow-hidden mx-2">
+        <div className="p-8 border-b border-slate-50 bg-slate-50/30">
+           <div className="relative group max-w-md">
+              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-blue-500 transition-colors" />
+              <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search Campaign Subject..." className="w-full pl-12 pr-6 py-3.5 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/5 text-sm font-bold shadow-sm" />
            </div>
         </div>
 
@@ -213,19 +221,42 @@ export const AdsCampaign: React.FC = () => {
                 <th className="px-8 py-5 text-[9px] font-black text-white uppercase tracking-widest">Objective</th>
                 <th className="px-8 py-5 text-[9px] font-black text-white uppercase tracking-widest text-center">Duration</th>
                 <th className="px-8 py-5 text-[9px] font-black text-white uppercase tracking-widest">Budgeting</th>
-                <th className="px-8 py-5 text-[9px] font-black text-white uppercase tracking-widest">Lifecycle</th>
-                {!isViewer && <th className="px-8 py-5 text-[9px] font-black text-white uppercase tracking-widest text-right">Ops</th>}
+                <th className="px-8 py-5 text-[9px] font-black text-white uppercase tracking-widest text-center">Lifecycle</th>
+                {!isViewer && <th className="px-8 py-5 text-[9px] font-black text-white uppercase tracking-widest text-right">Operations</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {filteredCampaigns.map((camp) => (
                 <tr key={camp.id} className="group hover:bg-slate-50/80 transition-all duration-300">
-                  <td className="px-8 py-8"><span className="text-[11px] font-black text-slate-900">{camp.platform}</span><p className="text-[8px] font-bold text-slate-400 uppercase mt-1">{camp.media_type}</p></td>
-                  <td className="px-8 py-8 max-w-xs"><p className="text-[11px] font-bold text-slate-700 leading-snug line-clamp-2">{camp.subject}</p></td>
-                  <td className="px-8 py-8"><span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-[9px] font-black uppercase border border-slate-200">{camp.primary_kpi}</span></td>
-                  <td className="px-8 py-8 text-center"><span className="text-[11px] font-black text-slate-900">{calculateDuration(camp)} Days</span></td>
-                  <td className="px-8 py-8"><span className="text-[11px] font-black text-emerald-600">${camp.spend} Spend</span><p className="text-[9px] font-bold text-slate-300 uppercase">Cap: ${camp.total_budget}</p></td>
-                  <td className="px-8 py-8"><span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase flex items-center gap-2 w-fit ${getStatusStyle(camp.status)}`}>{camp.status}</span></td>
+                  <td className="px-8 py-8">
+                    <span className="text-[11px] font-black text-slate-900">{camp.platform}</span>
+                    <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">{camp.media_type}</p>
+                  </td>
+                  <td className="px-8 py-8 max-w-xs">
+                    <p className="text-[11px] font-bold text-slate-700 leading-tight line-clamp-2">{camp.subject}</p>
+                  </td>
+                  <td className="px-8 py-8">
+                    <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-[9px] font-black uppercase border border-slate-200">{camp.primary_kpi}</span>
+                  </td>
+                  <td className="px-8 py-8 text-center">
+                    <span className="text-[11px] font-black text-slate-900">{getDuration(camp)} Days</span>
+                    <p className="text-[8px] font-bold text-slate-300 uppercase mt-1">{camp.status === 'Planned' ? 'Estimated' : 'Active'}</p>
+                  </td>
+                  <td className="px-8 py-8">
+                    <span className={`text-[11px] font-black ${camp.status === 'Planned' ? 'text-slate-300' : 'text-emerald-600'}`}>
+                      {camp.status === 'Planned' ? '$0.00' : `$${camp.spend} Spent`}
+                    </span>
+                    <p className="text-[9px] font-bold text-slate-300 uppercase">Cap: ${camp.total_budget}</p>
+                  </td>
+                  <td className="px-8 py-8 text-center">
+                    <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase border shadow-sm ${
+                      camp.status === 'Active' ? 'bg-blue-600 text-white' :
+                      camp.status === 'Completed' ? 'bg-emerald-600 text-white' :
+                      camp.status === 'Paused' ? 'bg-amber-500 text-white' : 'bg-slate-400 text-white'
+                    }`}>
+                      {camp.status}
+                    </span>
+                  </td>
                   {!isViewer && (
                     <td className="px-8 py-8">
                       <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all">
@@ -237,6 +268,14 @@ export const AdsCampaign: React.FC = () => {
                   )}
                 </tr>
               ))}
+              {filteredCampaigns.length === 0 && (
+                <tr>
+                   <td colSpan={7} className="px-8 py-20 text-center opacity-30">
+                      <LayoutList size={40} className="mx-auto mb-4" />
+                      <p className="text-[10px] font-black uppercase tracking-widest">Zero Ad Registries Detected</p>
+                   </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -244,56 +283,157 @@ export const AdsCampaign: React.FC = () => {
 
       {isModalOpen && isEditor && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-md animate-in fade-in">
-          <div className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in-95">
+          <div className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-5xl overflow-hidden animate-in zoom-in-95">
             <div className="p-10 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
                <div className="flex items-center gap-4">
                   <div className="w-14 h-14 bg-blue-600 rounded-3xl flex items-center justify-center text-white shadow-2xl shadow-blue-100"><Megaphone size={28}/></div>
-                  <div><h3 className="text-2xl font-black text-slate-900 tracking-tight">{editingCamp ? 'Update Lifecycle' : 'New Ad Registry'}</h3></div>
+                  <div>
+                    <h3 className="text-2xl font-black text-slate-900 tracking-tight">{editingCamp ? 'Transition Lifecycle' : 'Initial Planning'}</h3>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Current State: {formData.status}</p>
+                  </div>
                </div>
                <button onClick={() => setIsModalOpen(false)} className="w-12 h-12 flex items-center justify-center bg-white border border-slate-100 rounded-full text-slate-300 hover:text-slate-900 transition-all"><X size={24}/></button>
             </div>
-            <form onSubmit={handleSave} className="p-10 space-y-10">
+            
+            <form onSubmit={handleSave} className="p-10 space-y-10 overflow-y-auto max-h-[75vh]">
+              {/* Mandatory Info */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div className="col-span-2 space-y-6">
-                   <div className="grid grid-cols-2 gap-6">
-                      <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2.5 block ml-1">Platform</label>
-                        <select value={formData.platform} onChange={e => setFormData(p => ({ ...p, platform: e.target.value as any }))} className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-sm outline-none">
-                          <option value="Meta">Meta</option>
-                          <option value="Google">Google</option>
-                          <option value="Others">Others</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2.5 block ml-1">Asset Format</label>
-                        <select value={formData.media_type} onChange={e => setFormData(p => ({ ...p, media_type: e.target.value }))} className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-sm outline-none">
-                          <option>Image</option>
-                          <option>Carousel</option>
-                          <option>Video</option>
-                          <option>Reel</option>
-                        </select>
-                      </div>
-                   </div>
-                   <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2.5 block ml-1">Campaign Subject</label>
-                      <input required value={formData.subject} onChange={e => setFormData(p => ({ ...p, subject: e.target.value }))} className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-sm outline-none" placeholder="e.g. Clearance Sale" />
-                   </div>
-                </div>
-                <div className="space-y-6">
-                   <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2.5 block ml-1">Ad Lifecycle Status</label>
-                      <select value={formData.status} onChange={e => setFormData(p => ({ ...p, status: e.target.value as AdStatus }))} className="w-full px-5 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest outline-none cursor-pointer">
-                        <option value="Planned">Planned</option>
-                        <option value="Active">Active</option>
-                        <option value="Paused">Paused</option>
-                        <option value="Completed">Completed</option>
-                      </select>
-                   </div>
-                </div>
+                 <div>
+                    <label className={labelClass}>Operating Status</label>
+                    <select 
+                      value={formData.status} 
+                      onChange={e => setFormData(p => ({ ...p, status: e.target.value as AdStatus }))} 
+                      className={`${inputClass} !bg-slate-900 !text-white`}
+                    >
+                      {!editingCamp && <option value="Planned">Planned (New)</option>}
+                      {editingCamp && (
+                        <>
+                          <option value="Planned">Planned</option>
+                          <option value="Active">Active</option>
+                          <option value="Paused">Paused</option>
+                          <option value="Completed">Completed</option>
+                        </>
+                      )}
+                    </select>
+                 </div>
+                 <div className="md:col-span-2">
+                    <label className={labelClass}>Campaign Subject</label>
+                    <input required value={formData.subject} onChange={e => setFormData(p => ({ ...p, subject: e.target.value }))} className={inputClass} placeholder="e.g. SONOS Roam 2 Launch Phase 1" />
+                 </div>
+                 <div>
+                    <label className={labelClass}>Platform Hub</label>
+                    <select value={formData.platform} onChange={e => setFormData(p => ({ ...p, platform: e.target.value as any }))} className={inputClass}>
+                      <option value="Meta">Meta</option>
+                      <option value="Google">Google</option>
+                      <option value="Others">Others</option>
+                    </select>
+                 </div>
+                 <div>
+                    <label className={labelClass}>Primary KPI</label>
+                    <select value={formData.primary_kpi} onChange={e => setFormData(p => ({ ...p, primary_kpi: e.target.value }))} className={inputClass}>
+                      <option value="Traffic">Traffic (Clicks)</option>
+                      <option value="Sale">Conversion (Sales)</option>
+                      <option value="Engagement">Engagement</option>
+                      <option value="Lead Gen">Lead Generation</option>
+                      <option value="Awareness">Reach / Awareness</option>
+                    </select>
+                 </div>
+                 <div>
+                    <label className={labelClass}>Content Format</label>
+                    <select value={formData.media_type} onChange={e => setFormData(p => ({ ...p, media_type: e.target.value }))} className={inputClass}>
+                      <option>Image</option>
+                      <option>Carousel</option>
+                      <option>Video</option>
+                      <option>Reel</option>
+                    </select>
+                 </div>
               </div>
+
+              {/* Scheduling (Visible always, label changes based on status) */}
+              <div className="space-y-6 pt-8 border-t border-slate-50">
+                 <div className="flex items-center gap-3">
+                    <Calendar size={14} className="text-blue-600" />
+                    <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Timeline & Budget</h4>
+                 </div>
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                       <label className={labelClass}>Launch Date</label>
+                       <input type="date" required value={formData.start_date} onChange={e => setFormData(p => ({ ...p, start_date: e.target.value }))} className={inputClass} />
+                    </div>
+                    {formData.status === 'Completed' ? (
+                       <div>
+                        <label className={`${labelClass} text-emerald-600`}>Actual End Date</label>
+                        <input type="date" required value={formData.end_date} onChange={e => setFormData(p => ({ ...p, end_date: e.target.value }))} className={`${inputClass} bg-emerald-50 border-emerald-100`} />
+                      </div>
+                    ) : formData.status === 'Paused' ? (
+                      <div>
+                        <label className={`${labelClass} text-amber-500`}>Paused On</label>
+                        <input type="date" required value={formData.paused_date} onChange={e => setFormData(p => ({ ...p, paused_date: e.target.value }))} className={`${inputClass} bg-amber-50 border-amber-100`} />
+                      </div>
+                    ) : (
+                      <div>
+                        <label className={labelClass}>Estimated End Date</label>
+                        <input type="date" value={formData.end_date} onChange={e => setFormData(p => ({ ...p, end_date: e.target.value }))} className={inputClass} />
+                      </div>
+                    )}
+                    <div>
+                       <label className={labelClass}>Total Planned Budget ($)</label>
+                       <input type="number" step="0.01" required value={formData.total_budget} onChange={e => setFormData(p => ({ ...p, total_budget: Number(e.target.value) }))} className={inputClass} />
+                    </div>
+                 </div>
+                 <div className="mt-4 p-5 bg-slate-900 rounded-3xl flex items-center justify-between text-white shadow-xl">
+                    <div className="flex items-center gap-3">
+                       <Clock size={16} className="text-blue-400" />
+                       <span className="text-[10px] font-black uppercase tracking-widest">Calculated Duration:</span>
+                    </div>
+                    <span className="text-2xl font-black">{getDuration(formData)} Days</span>
+                 </div>
+              </div>
+
+              {/* Performance Metrics (ONLY for Active, Paused, Completed) */}
+              {formData.status !== 'Planned' && (
+                <div className="space-y-6 pt-8 border-t border-slate-50 animate-in slide-in-from-top-4">
+                   <div className="flex items-center gap-3">
+                      <BarChart3 size={14} className="text-emerald-500" />
+                      <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Performance Matrix</h4>
+                   </div>
+                   
+                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                      <div>
+                        <label className={labelClass}>Actual Spend ($)</label>
+                        <input type="number" step="0.01" value={formData.spend} onChange={e => setFormData(p => ({ ...p, spend: Number(e.target.value) }))} className={`${inputClass} bg-emerald-50/30 font-black text-emerald-700`} />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Impressions</label>
+                        <input type="number" value={formData.impression} onChange={e => setFormData(p => ({ ...p, impression: Number(e.target.value) }))} className={inputClass} />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Total Reach</label>
+                        <input type="number" value={formData.reach} onChange={e => setFormData(p => ({ ...p, reach: Number(e.target.value) }))} className={inputClass} />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Net Results ({formData.primary_kpi})</label>
+                        <input type="number" value={formData.result} onChange={e => setFormData(p => ({ ...p, result: e.target.value }))} className={inputClass} />
+                      </div>
+                   </div>
+
+                   <div>
+                      <label className={labelClass}>Post-Campaign Findings / Qualitative Notes</label>
+                      <textarea value={formData.other_effects} onChange={e => setFormData(p => ({ ...p, other_effects: e.target.value }))} className={`${inputClass} min-h-[120px] py-4 resize-none`} placeholder="Specific trends, demographic surprises, or creative performance notes..." />
+                   </div>
+                </div>
+              )}
+
+              {formData.status === 'Planned' && editingCamp && (
+                 <div className="p-6 bg-blue-50 border border-blue-100 rounded-3xl flex items-center gap-4 text-blue-700">
+                    <Info size={20} />
+                    <p className="text-[11px] font-bold">In Planning mode, spend and performance tracking are locked. Change status to "Active" to start recording results.</p>
+                 </div>
+              )}
+
               <div className="pt-10 border-t border-slate-50 flex gap-4">
-                <button type="submit" className="flex-1 py-5 bg-blue-600 text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-2xl shadow-blue-100 flex items-center justify-center gap-3 active:scale-[0.98]"><Save size={18}/> Authorize Update</button>
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-12 py-5 bg-slate-50 text-slate-400 rounded-3xl font-black text-xs uppercase tracking-widest">Abort</button>
+                <button type="submit" className="flex-1 py-5 bg-blue-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl shadow-blue-100 flex items-center justify-center gap-3 active:scale-[0.98] transition-all hover:bg-blue-700"><Save size={18}/> Commit to Database</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-12 py-5 bg-slate-50 text-slate-400 rounded-[2rem] font-black text-xs uppercase tracking-widest">Abort</button>
               </div>
             </form>
           </div>
@@ -302,8 +442,8 @@ export const AdsCampaign: React.FC = () => {
 
       <ConfirmationModal 
         isOpen={!!deleteConfirmId}
-        title="Delete Ad Entry?"
-        message="Are you sure you want to permanently discard this ad registry? Performance history for this unit will be lost."
+        title="Purge Campaign?"
+        message="Permanently remove this campaign registry from the analytical records?"
         onConfirm={handleDelete}
         onCancel={() => setDeleteConfirmId(null)}
       />
