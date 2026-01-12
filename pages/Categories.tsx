@@ -28,8 +28,7 @@ export const Categories: React.FC = () => {
   
   const [simpleDeleteCat, setSimpleDeleteCat] = useState<Category | null>(null);
 
-  // New state for viewing brand-specific posts
-  const [selectedBrandForViewing, setSelectedBrandForViewing] = useState<Category | null>(null);
+  const [selectedCategoryForViewing, setSelectedCategoryForViewing] = useState<Category | null>(null);
 
   const fetchData = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -63,6 +62,7 @@ export const Categories: React.FC = () => {
   const isEditor = role === 'Editor' || isAdmin;
   const isViewer = role === 'Viewer';
 
+  // Recursive count for the UI bubbles (showing total branch volume)
   const categoryPostCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     categories.forEach(cat => {
@@ -75,10 +75,42 @@ export const Categories: React.FC = () => {
     return counts;
   }, [categories, posts]);
 
-  const brandPosts = useMemo(() => {
-    if (!selectedBrandForViewing) return [];
-    return posts.filter(p => p.brand_type_id === selectedBrandForViewing.id);
-  }, [posts, selectedBrandForViewing]);
+  // Strict count for the "Eye" icon (showing only posts directly at this level)
+  const strictLevelCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    categories.forEach(cat => {
+      // Determine level
+      const isMain = !cat.parentId;
+      const parent = categories.find(c => c.id === cat.parentId);
+      const isSub = cat.parentId && !parent?.parentId;
+      const isBrand = cat.parentId && parent?.parentId;
+
+      counts[cat.id] = posts.filter(p => {
+        if (isBrand) return p.brand_type_id === cat.id;
+        if (isSub) return p.sub_category_id === cat.id && !p.brand_type_id;
+        if (isMain) return p.main_category_id === cat.id && !p.sub_category_id;
+        return false;
+      }).length;
+    });
+    return counts;
+  }, [categories, posts]);
+
+  const viewingPosts = useMemo(() => {
+    if (!selectedCategoryForViewing) return [];
+    
+    const cat = selectedCategoryForViewing;
+    const isMain = !cat.parentId;
+    const parent = categories.find(c => c.id === cat.parentId);
+    const isSub = cat.parentId && !parent?.parentId;
+    const isBrand = cat.parentId && parent?.parentId;
+
+    return posts.filter(p => {
+      if (isBrand) return p.brand_type_id === cat.id;
+      if (isSub) return p.sub_category_id === cat.id && !p.brand_type_id;
+      if (isMain) return p.main_category_id === cat.id && !p.sub_category_id;
+      return false;
+    });
+  }, [posts, selectedCategoryForViewing, categories]);
 
   const toggleExpand = (id: string) => {
     setExpandedIds(prev => {
@@ -174,7 +206,8 @@ export const Categories: React.FC = () => {
         {children.map(cat => {
           const hasChildren = categories.some(c => c.parentId === cat.id);
           const isExpanded = expandedIds.has(cat.id);
-          const postCount = categoryPostCounts[cat.id] || 0;
+          const totalBranchCount = categoryPostCounts[cat.id] || 0;
+          const directPostCount = strictLevelCounts[cat.id] || 0;
 
           return (
             <div key={cat.id} className="space-y-3">
@@ -182,13 +215,13 @@ export const Categories: React.FC = () => {
                 onClick={() => {
                   if (hasChildren) {
                     toggleExpand(cat.id);
-                  } else if (level === 2) {
-                    setSelectedBrandForViewing(cat);
+                  } else if (directPostCount > 0) {
+                    setSelectedCategoryForViewing(cat);
                   }
                 }}
                 className={`flex items-center justify-between p-4 bg-white border rounded-2xl transition-all group cursor-pointer outline-none select-none ${
                   level === 0 ? 'border-slate-100 shadow-sm' : 'border-slate-50'
-                } ${isExpanded || (level === 2 && selectedBrandForViewing?.id === cat.id) ? 'border-blue-200 bg-blue-50/20' : 'hover:border-blue-200'} ${level === 2 ? 'hover:shadow-lg hover:shadow-blue-50' : ''}`}
+                } ${isExpanded || (selectedCategoryForViewing?.id === cat.id) ? 'border-blue-200 bg-blue-50/20' : 'hover:border-blue-200'} ${level === 2 ? 'hover:shadow-lg hover:shadow-blue-50' : ''}`}
               >
                 <div className="flex items-center gap-4">
                   <div className="flex items-center justify-center w-6 text-slate-300">
@@ -197,10 +230,10 @@ export const Categories: React.FC = () => {
                     ) : null}
                   </div>
                   
-                  <div className={`w-10 h-10 flex items-center justify-center rounded-xl shadow-sm ${
-                    level === 0 ? 'bg-blue-600 text-white' : 
-                    level === 1 ? 'bg-emerald-500 text-white' : 
-                    'bg-amber-500 text-white'
+                  <div className={`w-10 h-10 flex items-center justify-center rounded-xl shadow-sm transition-transform group-hover:scale-105 ${
+                    level === 0 ? 'bg-blue-600 text-white shadow-blue-100 shadow-lg' : 
+                    level === 1 ? 'bg-emerald-500 text-white shadow-emerald-100 shadow-lg' : 
+                    'bg-amber-500 text-white shadow-amber-100 shadow-lg'
                   }`}>
                     {level === 0 ? <Folder size={18} strokeWidth={3} /> : 
                      level === 1 ? <FolderPlus size={18} strokeWidth={3} /> : 
@@ -211,11 +244,11 @@ export const Categories: React.FC = () => {
                     <div className="flex items-center gap-3">
                       <span className="font-black text-slate-800 tracking-tight text-sm">{cat.name}</span>
                       <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest border transition-all ${
-                        postCount > 0 
+                        totalBranchCount > 0 
                           ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
                           : 'bg-slate-50 text-slate-400 border-slate-100'
                       }`}>
-                        {postCount}
+                        {totalBranchCount}
                       </span>
                     </div>
                     <span className="text-[10px] text-slate-300 font-mono font-bold tracking-tighter uppercase mt-0.5">
@@ -225,19 +258,20 @@ export const Categories: React.FC = () => {
                 </div>
 
                 <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                  {level === 2 && (
+                  {directPostCount > 0 && (
                     <button 
-                      onClick={() => setSelectedBrandForViewing(cat)}
-                      className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors outline-none flex items-center gap-1"
-                      title="View Assigned Posts"
+                      onClick={() => setSelectedCategoryForViewing(cat)}
+                      className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors outline-none flex items-center gap-1 group/eye"
+                      title={`View ${directPostCount} direct posts`}
                     >
-                      <Eye size={18} strokeWidth={3} />
+                      <Eye size={18} strokeWidth={3} className="group-hover/eye:scale-110 transition-transform" />
                     </button>
                   )}
                   {level < 2 && isEditor && (
                     <button 
                       onClick={() => { setParentId(cat.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                      className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors outline-none"
+                      className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors outline-none"
+                      title="Add Child"
                     >
                       <Plus size={18} strokeWidth={3} />
                     </button>
@@ -246,6 +280,7 @@ export const Categories: React.FC = () => {
                     <button 
                       onClick={() => initiateDelete(cat)}
                       className="p-2 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors outline-none"
+                      title="Remove Segment"
                     >
                       <Trash2 size={18} strokeWidth={2.5} />
                     </button>
@@ -378,37 +413,41 @@ export const Categories: React.FC = () => {
         </div>
       </div>
 
-      {/* Brand Posts Modal */}
-      {selectedBrandForViewing && (
+      {/* Category Feed Modal */}
+      {selectedCategoryForViewing && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300">
           <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300 border border-white/20">
             <div className="p-10 border-b border-slate-50 flex items-center justify-between bg-slate-50/30 sticky top-0 z-10">
               <div className="flex items-center gap-5">
-                <div className="w-14 h-14 bg-amber-500 rounded-[1.5rem] flex items-center justify-center text-white shadow-xl shadow-amber-100">
+                <div className={`w-14 h-14 rounded-[1.5rem] flex items-center justify-center text-white shadow-xl ${
+                  !selectedCategoryForViewing.parentId ? 'bg-blue-600 shadow-blue-100' : 
+                  categories.find(c => c.id === selectedCategoryForViewing.parentId)?.parentId === null ? 'bg-emerald-500 shadow-emerald-100' :
+                  'bg-amber-500 shadow-amber-100'
+                }`}>
                   <Package size={28} strokeWidth={2.5}/>
                 </div>
                 <div>
-                  <h2 className="text-2xl font-black text-slate-900 tracking-tighter">{selectedBrandForViewing.name} - Content Feed</h2>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Assigned Repository Entries</p>
+                  <h2 className="text-2xl font-black text-slate-900 tracking-tighter">{selectedCategoryForViewing.name} - Direct Feed</h2>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Viewing posts specifically assigned to this level</p>
                 </div>
               </div>
               <button 
-                onClick={() => setSelectedBrandForViewing(null)}
-                className="w-10 h-10 flex items-center justify-center bg-white border border-slate-100 rounded-full text-slate-300 hover:text-slate-900 transition-all shadow-sm"
+                onClick={() => setSelectedCategoryForViewing(null)}
+                className="w-10 h-10 flex items-center justify-center bg-white border border-slate-100 rounded-full text-slate-300 hover:text-slate-900 transition-all shadow-sm hover:rotate-90 transition-all duration-300"
               >
                 <X size={20} strokeWidth={3} />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-10">
-              {brandPosts.length === 0 ? (
+            <div className="flex-1 overflow-y-auto p-10 custom-scrollbar">
+              {viewingPosts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 text-slate-300 space-y-4">
                   <Search size={48} strokeWidth={1.5} />
-                  <p className="text-sm font-bold uppercase tracking-widest">No products assigned to this brand.</p>
+                  <p className="text-sm font-bold uppercase tracking-widest">No entries found at this exact level.</p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {brandPosts.map((post) => (
+                  {viewingPosts.map((post) => (
                     <div key={post.id} className="group p-6 bg-white border border-slate-100 rounded-2xl flex items-center justify-between hover:border-blue-200 transition-all hover:shadow-lg hover:shadow-blue-50/50">
                        <div className="flex items-center gap-6">
                           <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-slate-400 group-hover:text-blue-600 group-hover:bg-blue-50 transition-all">
@@ -425,7 +464,7 @@ export const Categories: React.FC = () => {
                                 {post.status}
                               </span>
                             </div>
-                            <p className="text-base font-black text-slate-800 tracking-tight mt-1">{post.product_model || 'No Model Name'}</p>
+                            <p className="text-base font-black text-slate-800 tracking-tight mt-1">{post.product_model || 'General Awareness Post'}</p>
                             <div className="flex items-center gap-2 mt-2">
                                <span className="text-[9px] font-black text-slate-400 uppercase bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{post.content_type}</span>
                                <span className="text-[9px] font-black text-slate-400 uppercase bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{post.content_tag}</span>
@@ -458,9 +497,9 @@ export const Categories: React.FC = () => {
             <div className="p-8 border-t border-slate-50 bg-slate-50/20 flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <History size={16} className="text-slate-300" />
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Repository Status: Sync Active</span>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Sync Status: Active</span>
               </div>
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{brandPosts.length} Results Found</p>
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{viewingPosts.length} Records Found at this level</p>
             </div>
           </div>
         </div>
