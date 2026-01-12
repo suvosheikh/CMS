@@ -89,6 +89,15 @@ export class DBService {
     }
   }
 
+  static async updateCreativeLogsCreatorName(oldName: string, newName: string): Promise<void> {
+    if (this.isSupabaseConfigured()) {
+      await supabase
+        .from('creative_logs')
+        .update({ creator_name: newName })
+        .eq('creator_name', oldName);
+    }
+  }
+
   static async getCreativeSubOptions(): Promise<CreativeSubOption[]> {
     if (this.isSupabaseConfigured()) {
       const { data } = await supabase.from('creative_sub_options').select('*');

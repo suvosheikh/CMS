@@ -27,7 +27,11 @@ export const CreativeStore: React.FC = () => {
   
   // Date selection states
   const today = new Date().toISOString().split('T')[0];
-  const [selectedDates, setSelectedDates] = useState<string[]>([today]);
+  const currentMonth = new Date().toISOString().substring(0, 7);
+  
+  // Default to empty array to trigger "Present Month" logic in useMemo
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
+  
   const [tempPickedDate, setTempPickedDate] = useState('');
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
@@ -113,7 +117,6 @@ export const CreativeStore: React.FC = () => {
     });
   };
 
-  // Helper to add manual date
   const commitManualDate = () => {
     if (!tempPickedDate) return;
     setSelectedDates(prev => {
@@ -127,7 +130,6 @@ export const CreativeStore: React.FC = () => {
     setSelectedDates(prev => prev.filter(d => d !== date));
   };
 
-  // Presets logic
   const setRangePreset = (days: number) => {
     const dates = [];
     for (let i = 0; i < days; i++) {
@@ -169,14 +171,29 @@ export const CreativeStore: React.FC = () => {
 
   const handleUpdateDesigner = async () => {
     if (!editingDesignerId || !editingDesignerName.trim() || !isAdmin) return;
+    
+    const designerToUpdate = designers.find(d => d.id === editingDesignerId);
+    const oldName = designerToUpdate?.name;
+    const newName = editingDesignerName.trim();
+
     const updated: CreativeDesigner = {
       id: editingDesignerId,
-      name: editingDesignerName.trim()
+      name: newName
     };
+
+    // 1. Update the designer record itself
     await DBService.saveCreativeDesigner(updated);
+    
+    // 2. Perform cascading update on all logs that used the old name
+    if (oldName && oldName !== newName) {
+      await DBService.updateCreativeLogsCreatorName(oldName, newName);
+    }
+
+    // 3. Update local state and refresh
     setDesigners(prev => prev.map(d => d.id === editingDesignerId ? updated : d).sort((a, b) => a.name.localeCompare(b.name)));
     setEditingDesignerId(null);
     setEditingDesignerName('');
+    fetchData(); // Refresh logs to sync with renamed creator
   };
 
   const confirmDeleteDesigner = async () => {
@@ -230,27 +247,32 @@ export const CreativeStore: React.FC = () => {
     fetchData();
   };
 
+  // Filter Logic: Defaults to Current Month if no dates are selected
   const filteredLogs = useMemo(() => {
     return logs.filter(l => {
       const matchSearch = searchTerm === '' || 
         l.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         l.platform?.toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchDate = selectedDates.length === 0 || selectedDates.includes(l.date);
+      const matchDate = selectedDates.length > 0 
+        ? selectedDates.includes(l.date) 
+        : l.date.startsWith(currentMonth); // Default to present month
+      
       const matchCreator = filterCreator === '' || l.creator_name === filterCreator;
       
       return matchSearch && matchDate && matchCreator;
     });
-  }, [logs, searchTerm, selectedDates, filterCreator]);
+  }, [logs, searchTerm, selectedDates, filterCreator, currentMonth]);
 
+  // Real-time KPI Stats: Based on filteredLogs for instant updates
   const stats = useMemo(() => {
-    const totalItems = logs.reduce((acc, l) => acc + (Number(l.amount) || 0), 0);
-    const digitalCount = logs.filter(l => l.medium === 'Digital Image').reduce((acc, l) => acc + (Number(l.amount) || 0), 0);
-    const physicalCount = logs.filter(l => l.medium === 'Physical Image').reduce((acc, l) => acc + (Number(l.amount) || 0), 0);
-    const videoCount = logs.filter(l => l.medium === 'Video').reduce((acc, l) => acc + (Number(l.amount) || 0), 0);
+    const totalItems = filteredLogs.reduce((acc, l) => acc + (Number(l.amount) || 0), 0);
+    const digitalCount = filteredLogs.filter(l => l.medium === 'Digital Image').reduce((acc, l) => acc + (Number(l.amount) || 0), 0);
+    const physicalCount = filteredLogs.filter(l => l.medium === 'Physical Image').reduce((acc, l) => acc + (Number(l.amount) || 0), 0);
+    const videoCount = filteredLogs.filter(l => l.medium === 'Video').reduce((acc, l) => acc + (Number(l.amount) || 0), 0);
     
     return { totalItems, digitalCount, physicalCount, videoCount };
-  }, [logs]);
+  }, [filteredLogs]);
 
   if (loading) return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4">
@@ -266,7 +288,9 @@ export const CreativeStore: React.FC = () => {
           <div className="w-11 h-11 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-blue-600 shadow-sm"><Paintbrush size={22} /></div>
           <div className="flex flex-col text-left">
             <h1 className="text-4xl font-black text-[#0f172a] tracking-tighter leading-none">Creative Store</h1>
-            <p className="text-slate-500 font-semibold text-sm mt-1.5 leading-relaxed">Daily production ledger for designers and editors.</p>
+            <p className="text-slate-500 font-semibold text-sm mt-1.5 leading-relaxed">
+              Daily production ledger • <span className="text-blue-600 font-black">{selectedDates.length === 0 ? `Month ${currentMonth}` : `${selectedDates.length} Specific Dates`}</span>
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -290,38 +314,38 @@ export const CreativeStore: React.FC = () => {
         </div>
       )}
 
+      {/* Real-time Dynamic KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 px-2">
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6 group hover:border-blue-200 transition-all">
            <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><LayoutList size={24} /></div>
            <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Assets</p>
-              <p className="text-3xl font-black text-slate-900 tracking-tighter">{stats.totalItems}</p>
+              <p className="text-3xl font-black text-slate-900 tracking-tighter animate-in zoom-in-95">{stats.totalItems}</p>
            </div>
         </div>
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6 group hover:border-emerald-200 transition-all">
            <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><Monitor size={24} /></div>
            <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Digital Design</p>
-              <p className="text-3xl font-black text-slate-900 tracking-tighter">{stats.digitalCount}</p>
+              <p className="text-3xl font-black text-slate-900 tracking-tighter animate-in zoom-in-95">{stats.digitalCount}</p>
            </div>
         </div>
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6 group hover:border-amber-200 transition-all">
            <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><FileImage size={24} /></div>
            <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Physical Print</p>
-              <p className="text-3xl font-black text-slate-900 tracking-tighter">{stats.physicalCount}</p>
+              <p className="text-3xl font-black text-slate-900 tracking-tighter animate-in zoom-in-95">{stats.physicalCount}</p>
            </div>
         </div>
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6 group hover:border-purple-200 transition-all">
            <div className="w-14 h-14 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><VideoIcon size={24} /></div>
            <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Video Output</p>
-              <p className="text-3xl font-black text-slate-900 tracking-tighter">{stats.videoCount}</p>
+              <p className="text-3xl font-black text-slate-900 tracking-tighter animate-in zoom-in-95">{stats.videoCount}</p>
            </div>
         </div>
       </div>
 
-      {/* Advanced Filter Console */}
       <div className="bg-[#e2e8f0]/40 backdrop-blur-md p-2.5 rounded-full border border-white/40 shadow-sm flex items-center gap-4 transition-all hover:bg-[#e2e8f0]/60 mx-2">
         <div className="relative flex-1 group">
           <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-blue-500 transition-colors" size={18} />
@@ -334,7 +358,6 @@ export const CreativeStore: React.FC = () => {
           />
         </div>
 
-        {/* Updated Multi-Date Picker with Presets */}
         <div className="relative" ref={datePickerRef}>
           <button 
             onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
@@ -342,7 +365,7 @@ export const CreativeStore: React.FC = () => {
           >
             <Calendar size={18} className="text-slate-400" />
             <span className="text-xs font-bold text-slate-700 truncate max-w-[140px]">
-              {selectedDates.length === 0 ? "All Time" : 
+              {selectedDates.length === 0 ? "Present Month" : 
                selectedDates.length === 1 && selectedDates[0] === today ? "Today" :
                selectedDates.length === 7 && selectedDates.includes(today) ? "Last 7 Days" :
                `${selectedDates.length} Dates Active`}
@@ -352,18 +375,16 @@ export const CreativeStore: React.FC = () => {
           {isDatePickerOpen && (
             <div className="absolute top-full mt-3 right-0 w-80 bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 z-[100] animate-in slide-in-from-top-2">
               <div className="space-y-6">
-                {/* Presets Row */}
                 <div className="space-y-3">
                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Quick Ranges</p>
                    <div className="grid grid-cols-4 gap-2">
                       <button onClick={() => setSelectedDates([today])} className={`py-2 text-[10px] font-black rounded-xl border transition-all ${selectedDates.length === 1 && selectedDates[0] === today ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-100 text-slate-600 hover:border-blue-200'}`}>Today</button>
                       <button onClick={() => setRangePreset(7)} className="py-2 bg-white border border-slate-100 text-slate-600 hover:border-blue-200 rounded-xl text-[10px] font-black transition-all">7D</button>
-                      <button onClick={() => setRangePreset(15)} className="py-2 bg-white border border-slate-100 text-slate-600 hover:border-blue-200 rounded-xl text-[10px] font-black transition-all">15D</button>
                       <button onClick={() => setRangePreset(30)} className="py-2 bg-white border border-slate-100 text-slate-600 hover:border-blue-200 rounded-xl text-[10px] font-black transition-all">30D</button>
+                      <button onClick={() => setSelectedDates([])} className={`py-2 text-[10px] font-black rounded-xl border transition-all ${selectedDates.length === 0 ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-100 text-slate-600 hover:border-blue-200'}`}>Month</button>
                    </div>
                 </div>
 
-                {/* Manual Picker */}
                 <div className="space-y-3">
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Manual Selection</p>
                   <div className="flex gap-2">
@@ -386,11 +407,10 @@ export const CreativeStore: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Selected Tags */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between ml-1">
                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Active Pool</p>
-                    <button onClick={() => setSelectedDates([])} className="text-[9px] font-black text-red-500 uppercase tracking-widest hover:underline">Clear All</button>
+                    <button onClick={() => setSelectedDates([])} className="text-[9px] font-black text-red-500 uppercase tracking-widest hover:underline">Reset to Month</button>
                   </div>
                   <div className="max-h-[160px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                     {selectedDates.map(date => (
@@ -402,7 +422,7 @@ export const CreativeStore: React.FC = () => {
                       </div>
                     ))}
                     {selectedDates.length === 0 && (
-                      <p className="text-[10px] font-bold text-slate-300 italic text-center py-4">No specific dates selected. All logs visible.</p>
+                      <p className="text-[10px] font-bold text-slate-300 italic text-center py-4">Displaying all logs from {currentMonth}.</p>
                     )}
                   </div>
                 </div>
@@ -434,12 +454,12 @@ export const CreativeStore: React.FC = () => {
              <button 
               onClick={() => { 
                 setSearchTerm(''); 
-                setSelectedDates([today]); 
+                setSelectedDates([]); 
                 setFilterCreator(''); 
               }} 
               className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline flex items-center gap-2"
              >
-               <RotateCcw size={12} /> Reset View
+               <RotateCcw size={12} /> Reset to Default
              </button>
            )}
         </div>
@@ -482,7 +502,7 @@ export const CreativeStore: React.FC = () => {
                   <td className="px-8 py-8 text-center">
                     <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase inline-block ${
                       log.medium === 'Video' ? 'bg-purple-50 text-purple-600 border border-purple-100' :
-                      log.medium === 'Physical Image' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                      log.medium === 'Physical Image' ? 'bg-amber-50 text-amber-600 border-amber-100' :
                       'bg-emerald-50 text-emerald-600 border-emerald-100'
                     }`}>
                       {log.medium}
@@ -514,7 +534,6 @@ export const CreativeStore: React.FC = () => {
         </div>
       </div>
 
-      {/* Identity Management Modal */}
       {isIdentityModalOpen && isAdmin && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
           <div className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in-95">

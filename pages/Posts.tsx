@@ -5,7 +5,8 @@ import { PostLog, Category, User } from '../types';
 import { 
   Search, Filter, Plus, Download, Edit2, Trash2, 
   ChevronRight, ExternalLink, Calendar, 
-  Layers, Package, Monitor, X, Clock, History, CheckCircle, ShieldAlert
+  Layers, Package, Monitor, X, Clock, History, CheckCircle, ShieldAlert,
+  RotateCcw
 } from 'lucide-react';
 import { PostModal } from '../components/PostModal';
 import { ConfirmationModal } from '../components/ConfirmationModal';
@@ -17,8 +18,11 @@ export const Posts: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<PostLog | null>(null);
+  
+  // Filtering States
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMonth, setFilterMonth] = useState('');
+  const [filterDate, setFilterDate] = useState('');
   const [filterCat, setFilterCat] = useState('');
   
   const [selectedModelHistory, setSelectedModelHistory] = useState<string | null>(null);
@@ -59,11 +63,14 @@ export const Posts: React.FC = () => {
         models.some(m => m.toLowerCase().includes(searchTerm.toLowerCase())) ||
         p.campaign_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.id.toLowerCase().includes(searchTerm.toLowerCase());
+      
       const matchMonth = filterMonth === '' || p.month === filterMonth;
+      const matchDate = filterDate === '' || p.date === filterDate;
       const matchCat = filterCat === '' || p.main_category_id === filterCat;
-      return matchSearch && matchMonth && matchCat;
+      
+      return matchSearch && matchMonth && matchDate && matchCat;
     });
-  }, [posts, searchTerm, filterMonth, filterCat]);
+  }, [posts, searchTerm, filterMonth, filterDate, filterCat]);
 
   const modelHistoryData = useMemo(() => {
     if (!selectedModelHistory) return [];
@@ -87,6 +94,13 @@ export const Posts: React.FC = () => {
     fetchData();
   };
 
+  const resetFilters = () => {
+    setSearchTerm('');
+    setFilterMonth('');
+    setFilterDate('');
+    setFilterCat('');
+  };
+
   const getCatName = (id: string) => categories.find(c => c.id === id)?.name || 'N/A';
 
   if (loading) return (
@@ -95,6 +109,8 @@ export const Posts: React.FC = () => {
       <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Syncing Repository Control...</p>
     </div>
   );
+
+  const hasActiveFilters = searchTerm !== '' || filterMonth !== '' || filterDate !== '' || filterCat !== '';
 
   return (
     <div className="space-y-10 pb-20 animate-in fade-in duration-700">
@@ -128,42 +144,75 @@ export const Posts: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-[#e2e8f0]/40 backdrop-blur-md p-2.5 rounded-full border border-white/40 shadow-sm flex items-center gap-4 transition-all hover:bg-[#e2e8f0]/60">
-        <div className="relative flex-1 group">
+      {/* Filter Bar */}
+      <div className="bg-[#e2e8f0]/40 backdrop-blur-md p-3 rounded-[2.5rem] border border-white/40 shadow-sm flex flex-wrap items-center gap-4 transition-all hover:bg-[#e2e8f0]/60 mx-2">
+        <div className="relative flex-1 min-w-[300px] group">
           <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-blue-500 transition-colors" size={18} />
           <input 
             type="text" 
             placeholder="Search products, IDs or campaigns..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-14 pr-6 py-3.5 bg-white border-none rounded-full outline-none focus:ring-0 text-sm font-medium text-slate-600 placeholder:text-slate-400 shadow-sm"
+            className="w-full pl-14 pr-6 py-4 bg-white border-none rounded-full outline-none focus:ring-0 text-sm font-bold text-slate-600 placeholder:text-slate-400 shadow-sm"
           />
         </div>
 
-        <div className="flex items-center gap-3 bg-white rounded-full px-5 py-2.5 shadow-sm min-w-[180px]">
-           <Calendar size={18} className="text-slate-400" />
-           <input 
-             type="month" 
-             value={filterMonth} 
-             onChange={(e) => setFilterMonth(e.target.value)} 
-             className="text-xs font-bold text-slate-700 outline-none bg-transparent border-none p-0 cursor-pointer w-full tracking-tighter" 
-           />
+        {/* Date Filter */}
+        <div className="flex items-center gap-3 bg-white rounded-full px-5 py-3 shadow-sm min-w-[180px] hover:border-blue-200 border border-transparent transition-all">
+           <Calendar size={18} className="text-blue-500" />
+           <div className="flex flex-col">
+             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Specific Day</span>
+             <input 
+               type="date" 
+               value={filterDate} 
+               onChange={(e) => setFilterDate(e.target.value)} 
+               className="text-xs font-black text-slate-700 outline-none bg-transparent border-none p-0 cursor-pointer w-full tracking-tighter" 
+             />
+           </div>
         </div>
 
-        <div className="flex items-center gap-3 bg-white rounded-full px-5 py-1.5 shadow-sm min-w-[200px]">
-           <Layers size={18} className="text-slate-400" />
-           <select 
-             value={filterCat} 
-             onChange={(e) => setFilterCat(e.target.value)} 
-             className="text-xs font-bold text-slate-700 outline-none bg-transparent border-none py-2 pr-8 cursor-pointer w-full focus:ring-0"
-           >
-             <option value="">All Categories</option>
-             {categories.filter(c => !c.parentId).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-           </select>
+        {/* Month Filter */}
+        <div className="flex items-center gap-3 bg-white rounded-full px-5 py-3 shadow-sm min-w-[160px] hover:border-blue-200 border border-transparent transition-all">
+           <Clock size={18} className="text-slate-400" />
+           <div className="flex flex-col">
+             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Month</span>
+             <input 
+               type="month" 
+               value={filterMonth} 
+               onChange={(e) => setFilterMonth(e.target.value)} 
+               className="text-xs font-black text-slate-700 outline-none bg-transparent border-none p-0 cursor-pointer w-full tracking-tighter" 
+             />
+           </div>
         </div>
+
+        {/* Category Filter */}
+        <div className="flex items-center gap-3 bg-white rounded-full px-5 py-3 shadow-sm min-w-[200px] hover:border-blue-200 border border-transparent transition-all">
+           <Layers size={18} className="text-slate-400" />
+           <div className="flex flex-col flex-1">
+             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Category</span>
+             <select 
+               value={filterCat} 
+               onChange={(e) => setFilterCat(e.target.value)} 
+               className="text-xs font-black text-slate-700 outline-none bg-transparent border-none py-0 pr-8 cursor-pointer w-full focus:ring-0"
+             >
+               <option value="">All Categories</option>
+               {categories.filter(c => !c.parentId).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+             </select>
+           </div>
+        </div>
+
+        {hasActiveFilters && (
+          <button 
+            onClick={resetFilters}
+            className="p-4 bg-slate-900 text-white rounded-full hover:bg-slate-800 transition-all active:scale-90 shadow-lg shadow-slate-200"
+            title="Reset Filters"
+          >
+            <RotateCcw size={18} />
+          </button>
+        )}
       </div>
 
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl shadow-slate-200/20 overflow-hidden">
+      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl shadow-slate-200/20 overflow-hidden mx-2">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
