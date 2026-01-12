@@ -1,4 +1,42 @@
 
+/* 
+  =============================================================================
+  🔧 FIX SQL FOR EXISTING DATABASE (DATA PRESERVATION)
+  =============================================================================
+  আপনার আগের ডেটাবেসের ডেটা ঠিক রেখে লগইন সিস্টেম চালু করতে নিচের কোডটি 
+  Supabase SQL Editor-এ রান করুন:
+
+  CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+  CREATE OR REPLACE FUNCTION public.login_user(username_input text, password_input text)
+  RETURNS SETOF public.users
+  LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions
+  AS $$
+  BEGIN
+    RETURN QUERY
+    SELECT * FROM public.users
+    WHERE (name = username_input OR email = username_input)
+    AND (password = crypt(password_input, password) OR password = password_input);
+  END;
+  $$;
+
+  CREATE OR REPLACE FUNCTION public.hash_user_password()
+  RETURNS TRIGGER AS $$
+  BEGIN
+    IF TG_OP = 'INSERT' OR (TG_OP = 'UPDATE' AND NEW.password <> OLD.password) THEN
+      NEW.password := crypt(NEW.password, gen_salt('bf'));
+    END IF;
+    RETURN NEW;
+  END;
+  $$ LANGUAGE plpgsql;
+
+  DROP TRIGGER IF EXISTS trigger_hash_password ON public.users;
+  CREATE TRIGGER trigger_hash_password
+  BEFORE INSERT OR UPDATE ON public.users
+  FOR EACH ROW EXECUTE FUNCTION public.hash_user_password();
+  =============================================================================
+*/
+
 import { PostLog, Category, User, Role, Campaign, AdCampaignEntry, Feedback, CreativeLog, CreativeSubOption, CreativeDesigner } from '../types';
 import { supabase } from './supabase';
 
@@ -13,89 +51,84 @@ export class DBService {
   }
 
   // --- AUTHENTICATION ---
-  static async login(username: string, pass: string): Promise<User | null> {
-    if (!this.isSupabaseConfigured()) return null;
+  static async login(username: string, pass: string): Promise<{ user: User | null, setupRequired?: boolean, error?: string }> {
+    if (!this.isSupabaseConfigured()) return { user: null, error: 'Supabase settings not applied.' };
     
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .or(`name.eq.${username},email.eq.${username}`)
-      .eq('password', pass)
-      .maybeSingle();
+    try {
+      const { data, error } = await supabase
+        .rpc('login_user', { 
+          username_input: username, 
+          password_input: pass 
+        })
+        .maybeSingle();
 
-    if (error) {
-      console.error('Login technical error:', error.message);
-      return null;
+      if (error) {
+        if (error.message.includes('function') || error.message.includes('login_user')) {
+          return { user: null, setupRequired: true, error: 'RPC function login_user is missing in this database.' };
+        }
+        return { user: null, error: error.message };
+      }
+
+      if (!data) {
+        return { user: null, error: 'Invalid security key or username.' };
+      }
+
+      return { user: data as User | null };
+    } catch (err: any) {
+      return { user: null, error: err.message };
     }
-
-    return data as User | null;
   }
 
   static async updatePassword(userId: string, newPass: string): Promise<boolean> {
     if (!this.isSupabaseConfigured()) return false;
-    const { error } = await supabase
-      .from('users')
-      .update({ password: newPass })
-      .eq('id', userId);
-    
+    const { error } = await supabase.from('users').update({ password: newPass }).eq('id', userId);
     return !error;
+  }
+
+  // --- FEEDBACK ---
+  static async getFeedback(): Promise<Feedback[]> {
+    if (this.isSupabaseConfigured()) {
+      const { data } = await supabase.from('feedbacks').select('*').order('created_at', { ascending: false });
+      return (data as Feedback[]) || [];
+    }
+    return [];
+  }
+
+  static async toggleFeedbackResolution(id: string, is_resolved: boolean): Promise<void> {
+    if (this.isSupabaseConfigured()) {
+      await supabase.from('feedbacks').update({ is_resolved }).eq('id', id);
+    }
+  }
+
+  static async deleteFeedback(id: string): Promise<void> {
+    if (this.isSupabaseConfigured()) {
+      await supabase.from('feedbacks').delete().eq('id', id);
+    }
   }
 
   // --- POSTS ---
   static async getPosts(): Promise<PostLog[]> {
     if (this.isSupabaseConfigured()) {
-      const { data, error } = await supabase
-        .from('posts')
-        .select('*')
-        .order('date', { ascending: false });
+      const { data } = await supabase.from('posts').select('*').order('date', { ascending: false });
       return (data as PostLog[]) || [];
     }
     return [];
   }
-
-  static async savePost(post: PostLog): Promise<void> {
-    if (this.isSupabaseConfigured()) {
-      await supabase.from('posts').upsert(post);
-    }
-  }
-
-  static async deletePost(id: string): Promise<void> {
-    if (this.isSupabaseConfigured()) {
-      await supabase.from('posts').delete().eq('id', id);
-    }
-  }
+  static async savePost(post: PostLog): Promise<void> { if (this.isSupabaseConfigured()) await supabase.from('posts').upsert(post); }
+  static async deletePost(id: string): Promise<void> { if (this.isSupabaseConfigured()) await supabase.from('posts').delete().eq('id', id); }
 
   // --- CREATIVE STORE ---
   static async getCreativeLogs(): Promise<CreativeLog[]> {
     if (this.isSupabaseConfigured()) {
-      const { data } = await supabase
-        .from('creative_logs')
-        .select('*')
-        .order('date', { ascending: false });
+      const { data } = await supabase.from('creative_logs').select('*').order('date', { ascending: false });
       return (data as CreativeLog[]) || [];
     }
     return [];
   }
-
-  static async saveCreativeLog(log: CreativeLog): Promise<void> {
-    if (this.isSupabaseConfigured()) {
-      await supabase.from('creative_logs').upsert(log);
-    }
-  }
-
-  static async deleteCreativeLog(id: string): Promise<void> {
-    if (this.isSupabaseConfigured()) {
-      await supabase.from('creative_logs').delete().eq('id', id);
-    }
-  }
-
+  static async saveCreativeLog(log: CreativeLog): Promise<void> { if (this.isSupabaseConfigured()) await supabase.from('creative_logs').upsert(log); }
+  static async deleteCreativeLog(id: string): Promise<void> { if (this.isSupabaseConfigured()) await supabase.from('creative_logs').delete().eq('id', id); }
   static async updateCreativeLogsCreatorName(oldName: string, newName: string): Promise<void> {
-    if (this.isSupabaseConfigured()) {
-      await supabase
-        .from('creative_logs')
-        .update({ creator_name: newName })
-        .eq('creator_name', oldName);
-    }
+    if (this.isSupabaseConfigured()) await supabase.from('creative_logs').update({ creator_name: newName }).eq('creator_name', oldName);
   }
 
   static async getCreativeSubOptions(): Promise<CreativeSubOption[]> {
@@ -105,18 +138,8 @@ export class DBService {
     }
     return [];
   }
-
-  static async saveCreativeSubOption(option: CreativeSubOption): Promise<void> {
-    if (this.isSupabaseConfigured()) {
-      await supabase.from('creative_sub_options').upsert(option);
-    }
-  }
-
-  static async deleteCreativeSubOption(id: string): Promise<void> {
-    if (this.isSupabaseConfigured()) {
-      await supabase.from('creative_sub_options').delete().eq('id', id);
-    }
-  }
+  static async saveCreativeSubOption(option: CreativeSubOption): Promise<void> { if (this.isSupabaseConfigured()) await supabase.from('creative_sub_options').upsert(option); }
+  static async deleteCreativeSubOption(id: string): Promise<void> { if (this.isSupabaseConfigured()) await supabase.from('creative_sub_options').delete().eq('id', id); }
 
   static async getCreativeDesigners(): Promise<CreativeDesigner[]> {
     if (this.isSupabaseConfigured()) {
@@ -125,18 +148,8 @@ export class DBService {
     }
     return [];
   }
-
-  static async saveCreativeDesigner(designer: CreativeDesigner): Promise<void> {
-    if (this.isSupabaseConfigured()) {
-      await supabase.from('creative_designers').upsert(designer);
-    }
-  }
-
-  static async deleteCreativeDesigner(id: string): Promise<void> {
-    if (this.isSupabaseConfigured()) {
-      await supabase.from('creative_designers').delete().eq('id', id);
-    }
-  }
+  static async saveCreativeDesigner(designer: CreativeDesigner): Promise<void> { if (this.isSupabaseConfigured()) await supabase.from('creative_designers').upsert(designer); }
+  static async deleteCreativeDesigner(id: string): Promise<void> { if (this.isSupabaseConfigured()) await supabase.from('creative_designers').delete().eq('id', id); }
 
   // --- CATEGORIES ---
   static async getCategories(): Promise<Category[]> {
@@ -146,20 +159,10 @@ export class DBService {
     }
     return [];
   }
+  static async saveCategory(cat: Category): Promise<void> { if (this.isSupabaseConfigured()) await supabase.from('categories').upsert(cat); }
+  static async deleteCategory(id: string): Promise<void> { if (this.isSupabaseConfigured()) await supabase.from('categories').delete().eq('id', id); }
 
-  static async saveCategory(cat: Category): Promise<void> {
-    if (this.isSupabaseConfigured()) {
-      await supabase.from('categories').upsert(cat);
-    }
-  }
-
-  static async deleteCategory(id: string): Promise<void> {
-    if (this.isSupabaseConfigured()) {
-      await supabase.from('categories').delete().eq('id', id);
-    }
-  }
-
-  // --- ORIGINAL CAMPAIGNS ---
+  // --- CAMPAIGNS ---
   static async getCampaigns(): Promise<Campaign[]> {
     if (this.isSupabaseConfigured()) {
       const { data } = await supabase.from('campaigns').select('*').order('start_date', { ascending: false });
@@ -167,20 +170,10 @@ export class DBService {
     }
     return [];
   }
+  static async saveCampaign(camp: Campaign): Promise<void> { if (this.isSupabaseConfigured()) await supabase.from('campaigns').upsert(camp); }
+  static async deleteCampaign(id: string): Promise<void> { if (this.isSupabaseConfigured()) await supabase.from('campaigns').delete().eq('id', id); }
 
-  static async saveCampaign(camp: Campaign): Promise<void> {
-    if (this.isSupabaseConfigured()) {
-      await supabase.from('campaigns').upsert(camp);
-    }
-  }
-
-  static async deleteCampaign(id: string): Promise<void> {
-    if (this.isSupabaseConfigured()) {
-      await supabase.from('campaigns').delete().eq('id', id);
-    }
-  }
-
-  // --- NEW ADS CAMPAIGNS ---
+  // --- ADS CAMPAIGNS ---
   static async getAdsCampaigns(): Promise<AdCampaignEntry[]> {
     if (this.isSupabaseConfigured()) {
       const { data } = await supabase.from('ads_campaigns').select('*').order('start_date', { ascending: false });
@@ -188,7 +181,6 @@ export class DBService {
     }
     return [];
   }
-
   static async getAdsCampaignById(id: string): Promise<AdCampaignEntry | null> {
     if (this.isSupabaseConfigured()) {
       const { data } = await supabase.from('ads_campaigns').select('*').eq('id', id).maybeSingle();
@@ -196,18 +188,8 @@ export class DBService {
     }
     return null;
   }
-
-  static async saveAdsCampaign(camp: AdCampaignEntry): Promise<void> {
-    if (this.isSupabaseConfigured()) {
-      await supabase.from('ads_campaigns').upsert(camp);
-    }
-  }
-
-  static async deleteAdsCampaign(id: string): Promise<void> {
-    if (this.isSupabaseConfigured()) {
-      await supabase.from('ads_campaigns').delete().eq('id', id);
-    }
-  }
+  static async saveAdsCampaign(camp: AdCampaignEntry): Promise<void> { if (this.isSupabaseConfigured()) await supabase.from('ads_campaigns').upsert(camp); }
+  static async deleteAdsCampaign(id: string): Promise<void> { if (this.isSupabaseConfigured()) await supabase.from('ads_campaigns').delete().eq('id', id); }
 
   // --- USERS ---
   static async getUsers(): Promise<User[]> {
@@ -217,62 +199,17 @@ export class DBService {
     }
     return [];
   }
+  static async saveUser(user: User): Promise<void> { if (this.isSupabaseConfigured()) await supabase.from('users').upsert(user); }
+  static async deleteUser(id: string): Promise<void> { if (this.isSupabaseConfigured()) await supabase.from('users').delete().eq('id', id); }
 
-  static async saveUser(user: User): Promise<void> {
-    if (this.isSupabaseConfigured()) {
-      await supabase.from('users').upsert(user);
-    }
-  }
-
-  static async deleteUser(id: string): Promise<void> {
-    if (this.isSupabaseConfigured()) {
-      await supabase.from('users').delete().eq('id', id);
-    }
-  }
-
-  // --- FEEDBACK ---
-  static async getFeedback(): Promise<Feedback[]> {
-    if (this.isSupabaseConfigured()) {
-      const { data } = await supabase
-        .from('feedback')
-        .select('*')
-        .order('created_at', { ascending: false });
-      return (data as Feedback[]) || [];
-    }
-    return [];
-  }
-
-  static async toggleFeedbackResolution(id: string, isResolved: boolean): Promise<void> {
-    if (this.isSupabaseConfigured()) {
-      await supabase
-        .from('feedback')
-        .update({ is_resolved: isResolved })
-        .eq('id', id);
-    }
-  }
-
-  static async deleteFeedback(id: string): Promise<void> {
-    if (this.isSupabaseConfigured()) {
-      await supabase.from('feedback').delete().eq('id', id);
-    }
-  }
-
-  // --- SESSION MANAGEMENT ---
+  // --- SESSION ---
   static async getCurrentUser(): Promise<User | null> {
     const data = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
     if (!data) return null;
-    try {
-      return JSON.parse(data);
-    } catch {
-      return null;
-    }
+    try { return JSON.parse(data); } catch { return null; }
   }
-
   static setCurrentUser(user: User | null): void {
-    if (user) {
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-    }
+    if (user) localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+    else localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
   }
 }
