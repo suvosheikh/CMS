@@ -2,14 +2,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { DBService } from '../services/dbService';
-import { AdCampaignEntry, AdStatus, User } from '../types';
+import { AdCampaignEntry, AdStatus, User, AdDailyMetric } from '../types';
 import { 
   Megaphone, Plus, Trash2, Edit2, X, Save, 
   Search, Eye, CheckCircle2,
   Calendar, DollarSign, Activity, Flag,
   ShieldAlert, Globe, PlayCircle, PauseCircle, Clock,
   BarChart3, LayoutList, Target, TrendingUp, AlertCircle,
-  Info, RotateCcw, Filter
+  Info, RotateCcw, Filter, PlusCircle, Calculator
 } from 'lucide-react';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 
@@ -21,7 +21,6 @@ export const AdsCampaign: React.FC = () => {
   const [editingCamp, setEditingCamp] = useState<AdCampaignEntry | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Default to Present Year (e.g., "2025")
   const currentYear = new Date().getFullYear().toString();
   const [filterMonth, setFilterMonth] = useState(currentYear);
   
@@ -43,8 +42,16 @@ export const AdsCampaign: React.FC = () => {
     result: '0',
     impression: 0,
     reach: 0,
-    other_effects: ''
+    other_effects: '',
+    daily_metrics: []
   });
+
+  // Daily metric form state
+  const [metricDate, setMetricDate] = useState(today);
+  const [metricReach, setMetricReach] = useState('');
+  const [metricImpression, setMetricImpression] = useState('');
+  const [metricResult, setMetricResult] = useState('');
+  const [metricSpend, setMetricSpend] = useState('');
 
   const fetchData = async () => {
     setLoading(true);
@@ -66,7 +73,6 @@ export const AdsCampaign: React.FC = () => {
   const isEditor = role === 'Editor' || isAdmin;
   const isViewer = role === 'Viewer';
 
-  // Duration Calculation Logic
   const getDuration = (ad: Partial<AdCampaignEntry>) => {
     if (!ad.start_date) return 0;
     const start = new Date(ad.start_date);
@@ -89,7 +95,7 @@ export const AdsCampaign: React.FC = () => {
     if (isViewer) return;
     if (camp) {
       setEditingCamp(camp);
-      setFormData({ ...camp });
+      setFormData({ ...camp, daily_metrics: camp.daily_metrics || [] });
     } else {
       setEditingCamp(null);
       setFormData({
@@ -106,10 +112,77 @@ export const AdsCampaign: React.FC = () => {
         result: '0',
         impression: 0,
         reach: 0,
-        other_effects: ''
+        other_effects: '',
+        daily_metrics: []
       });
     }
     setIsModalOpen(true);
+  };
+
+  const addDailyMetric = () => {
+    if (!metricDate) return;
+    
+    const newMetric: AdDailyMetric = {
+      date: metricDate,
+      reach: parseInt(metricReach) || 0,
+      impression: parseInt(metricImpression) || 0,
+      result: parseInt(metricResult) || 0,
+      spend: parseFloat(metricSpend) || 0
+    };
+
+    setFormData(prev => {
+      const existing = prev.daily_metrics || [];
+      // Overwrite if same date exists, else add
+      const filtered = existing.filter(m => m.date !== metricDate);
+      const updated = [...filtered, newMetric].sort((a, b) => a.date.localeCompare(b.date));
+      
+      const totalReach = updated.reduce((acc, m) => acc + m.reach, 0);
+      const totalImp = updated.reduce((acc, m) => acc + m.impression, 0);
+      const totalResult = updated.reduce((acc, m) => acc + m.result, 0);
+      const totalSpend = updated.reduce((acc, m) => acc + m.spend, 0);
+      
+      return { 
+        ...prev, 
+        daily_metrics: updated,
+        reach: totalReach,
+        impression: totalImp,
+        result: totalResult.toString(),
+        spend: totalSpend
+      };
+    });
+
+    setMetricReach('');
+    setMetricImpression('');
+    setMetricResult('');
+    setMetricSpend('');
+    setMetricDate(today);
+  };
+
+  const editDailyMetric = (metric: AdDailyMetric) => {
+    setMetricDate(metric.date);
+    setMetricReach(metric.reach.toString());
+    setMetricImpression(metric.impression.toString());
+    setMetricResult(metric.result.toString());
+    setMetricSpend(metric.spend.toString());
+  };
+
+  const removeDailyMetric = (date: string) => {
+    setFormData(prev => {
+      const updated = (prev.daily_metrics || []).filter(m => m.date !== date);
+      const totalReach = updated.reduce((acc, m) => acc + m.reach, 0);
+      const totalImp = updated.reduce((acc, m) => acc + m.impression, 0);
+      const totalResult = updated.reduce((acc, m) => acc + m.result, 0);
+      const totalSpend = updated.reduce((acc, m) => acc + m.spend, 0);
+      
+      return { 
+        ...prev, 
+        daily_metrics: updated,
+        reach: totalReach,
+        impression: totalImp,
+        result: totalResult.toString(),
+        spend: totalSpend
+      };
+    });
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -140,7 +213,6 @@ export const AdsCampaign: React.FC = () => {
     fetchData();
   };
 
-  // Filter Logic: Defaults to Year, narrows to Month if selected
   const filteredCampaigns = useMemo(() => {
     return campaigns.filter(c => {
       const matchSearch = searchTerm === '' || 
@@ -184,7 +256,6 @@ export const AdsCampaign: React.FC = () => {
         )}
       </header>
 
-      {/* Campaign Dashboard - Dynamic stats based on the Year/Month filter */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 px-2">
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6 group hover:border-emerald-200 transition-all">
            <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-all"><DollarSign size={24} /></div>
@@ -217,7 +288,6 @@ export const AdsCampaign: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-[3rem] border border-slate-100 shadow-2xl shadow-slate-200/40 overflow-hidden mx-2">
-        {/* Filter Bar */}
         <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex flex-wrap items-center gap-6">
            <div className="relative group flex-1 max-w-md">
               <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-blue-500 transition-colors" />
@@ -420,38 +490,117 @@ export const AdsCampaign: React.FC = () => {
                        <input type="number" step="0.01" required value={formData.total_budget} onChange={e => setFormData(p => ({ ...p, total_budget: Number(e.target.value) }))} className={inputClass} />
                     </div>
                  </div>
-                 <div className="mt-4 p-5 bg-slate-900 rounded-3xl flex items-center justify-between text-white shadow-xl">
-                    <div className="flex items-center gap-3">
-                       <Clock size={16} className="text-blue-400" />
-                       <span className="text-[10px] font-black uppercase tracking-widest">Calculated Duration:</span>
-                    </div>
-                    <span className="text-2xl font-black">{getDuration(formData)} Days</span>
-                 </div>
               </div>
 
               {formData.status !== 'Planned' && (
-                <div className="space-y-6 pt-8 border-t border-slate-50 animate-in slide-in-from-top-4">
+                <div className="space-y-10 pt-8 border-t border-slate-50 animate-in slide-in-from-top-4">
                    <div className="flex items-center gap-3">
-                      <BarChart3 size={14} className="text-emerald-500" />
-                      <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Performance Matrix</h4>
+                      <TrendingUp size={14} className="text-emerald-500" />
+                      <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Performance Tracking (Daily Logs)</h4>
                    </div>
                    
+                   {/* Daily Metric Input Grid */}
+                   <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                         <div>
+                            <label className={labelClass}>Entry Date</label>
+                            <input type="date" value={metricDate} onChange={e => setMetricDate(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold" />
+                         </div>
+                         <div>
+                            <label className={labelClass}>Results</label>
+                            <input type="number" value={metricResult} onChange={e => setMetricResult(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold" placeholder="QTY" />
+                         </div>
+                         <div>
+                            <label className={labelClass}>Reach</label>
+                            <input type="number" value={metricReach} onChange={e => setMetricReach(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold" placeholder="Reach" />
+                         </div>
+                         <div>
+                            <label className={labelClass}>Impressions</label>
+                            <input type="number" value={metricImpression} onChange={e => setMetricImpression(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold" placeholder="Impr." />
+                         </div>
+                         <div>
+                            <label className={labelClass}>Spend ($)</label>
+                            <input type="number" step="0.01" value={metricSpend} onChange={e => setMetricSpend(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold" placeholder="Cost" />
+                         </div>
+                      </div>
+                      <div className="flex justify-end pt-2">
+                        <button 
+                           type="button" 
+                           onClick={addDailyMetric}
+                           className="px-10 py-3.5 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-100 flex items-center justify-center gap-2 hover:bg-blue-700 active:scale-95 transition-all"
+                         >
+                           <PlusCircle size={14} /> Commit Entry
+                         </button>
+                      </div>
+
+                      {/* Daily List */}
+                      <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                         {(formData.daily_metrics || []).map((m, idx) => (
+                           <div key={idx} className="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-2xl animate-in slide-in-from-right-4 group">
+                              <div className="flex items-center gap-8">
+                                 <div className="flex items-center gap-3 min-w-[110px]">
+                                    <Calendar size={14} className="text-blue-500" />
+                                    <span className="text-[11px] font-black text-slate-900">{m.date}</span>
+                                 </div>
+                                 <div className="grid grid-cols-4 gap-6 min-w-[420px]">
+                                    <div className="flex flex-col">
+                                       <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Results</span>
+                                       <span className="text-xs font-black text-purple-600">{m.result.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                       <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Reach</span>
+                                       <span className="text-xs font-black text-emerald-600">{m.reach.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                       <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Impr.</span>
+                                       <span className="text-xs font-black text-blue-600">{m.impression.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                       <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Spend</span>
+                                       <span className="text-xs font-black text-slate-900">${m.spend.toLocaleString()}</span>
+                                    </div>
+                                 </div>
+                              </div>
+                              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                                <button type="button" onClick={() => editDailyMetric(m)} className="p-2 text-slate-300 hover:text-blue-600 transition-colors" title="Edit day data"><Edit2 size={14} /></button>
+                                <button type="button" onClick={() => removeDailyMetric(m.date)} className="p-2 text-slate-300 hover:text-red-500 transition-colors" title="Delete day record"><Trash2 size={16} /></button>
+                              </div>
+                           </div>
+                         ))}
+                         {(!formData.daily_metrics || formData.daily_metrics.length === 0) && (
+                           <div className="py-10 text-center bg-white/50 rounded-2xl border-2 border-dashed border-slate-200">
+                              <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">No daily performance records found for this period.</p>
+                           </div>
+                         )}
+                      </div>
+                   </div>
+
+                   {/* Summary Calculation Display */}
                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                      <div>
-                        <label className={labelClass}>Actual Spend ($)</label>
-                        <input type="number" step="0.01" value={formData.spend} onChange={e => setFormData(p => ({ ...p, spend: Number(e.target.value) }))} className={`${inputClass} bg-emerald-50/30 font-black text-emerald-700`} />
+                      <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-3xl">
+                        <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1 block flex items-center gap-1"><Calculator size={10}/> Total Net Spend</label>
+                        <p className="text-2xl font-black text-emerald-700">${formData.spend?.toLocaleString()}</p>
                       </div>
-                      <div>
-                        <label className={labelClass}>Impressions</label>
-                        <input type="number" value={formData.impression} onChange={e => setFormData(p => ({ ...p, impression: Number(e.target.value) }))} className={inputClass} />
+                      <div className="p-6 bg-purple-50 border border-purple-100 rounded-3xl relative">
+                        <label className="text-[9px] font-black text-purple-600 uppercase tracking-widest mb-1 block">Total Net Results</label>
+                        <input 
+                          type="number" 
+                          value={formData.result} 
+                          onChange={e => setFormData(p => ({ ...p, result: e.target.value }))} 
+                          className={`w-full bg-transparent text-2xl font-black text-purple-700 outline-none border-none p-0 ${formData.daily_metrics?.length ? 'pointer-events-none opacity-100' : ''}`}
+                          readOnly={(formData.daily_metrics?.length || 0) > 0}
+                        />
+                        {(formData.daily_metrics?.length || 0) > 0 && <span className="absolute bottom-2 right-4 text-[7px] font-black text-purple-300 uppercase tracking-tighter">Auto-Calculated</span>}
                       </div>
-                      <div>
-                        <label className={labelClass}>Total Reach</label>
-                        <input type="number" value={formData.reach} onChange={e => setFormData(p => ({ ...p, reach: Number(e.target.value) }))} className={inputClass} />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Net Results ({formData.primary_kpi})</label>
-                        <input type="number" value={formData.result} onChange={e => setFormData(p => ({ ...p, result: e.target.value }))} className={inputClass} />
+                      <div className="p-6 bg-slate-900 rounded-3xl col-span-2 flex items-center justify-between text-white">
+                         <div className="flex flex-col">
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Total Reach</span>
+                            <span className="text-2xl font-black">{formData.reach?.toLocaleString()}</span>
+                         </div>
+                         <div className="flex flex-col text-right">
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Total Impressions</span>
+                            <span className="text-2xl font-black">{formData.impression?.toLocaleString()}</span>
+                         </div>
                       </div>
                    </div>
 
@@ -460,13 +609,6 @@ export const AdsCampaign: React.FC = () => {
                       <textarea value={formData.other_effects} onChange={e => setFormData(p => ({ ...p, other_effects: e.target.value }))} className={`${inputClass} min-h-[120px] py-4 resize-none`} placeholder="Specific trends, demographic surprises, or creative performance notes..." />
                    </div>
                 </div>
-              )}
-
-              {formData.status === 'Planned' && editingCamp && (
-                 <div className="p-6 bg-blue-50 border border-blue-100 rounded-3xl flex items-center gap-4 text-blue-700">
-                    <Info size={20} />
-                    <p className="text-[11px] font-bold">In Planning mode, spend and performance tracking are locked. Change status to "Active" to start recording results.</p>
-                 </div>
               )}
 
               <div className="pt-10 border-t border-slate-50 flex gap-4">

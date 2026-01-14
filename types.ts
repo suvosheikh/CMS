@@ -23,6 +23,14 @@ export interface Campaign {
   start_date: string;
 }
 
+export interface AdDailyMetric {
+  date: string;
+  reach: number;
+  impression: number;
+  result: number;
+  spend: number;
+}
+
 export interface AdCampaignEntry {
   id: string;
   platform: 'Meta' | 'Google' | 'Others';
@@ -41,6 +49,7 @@ export interface AdCampaignEntry {
   impression: number;
   reach: number;
   other_effects: string;
+  daily_metrics?: AdDailyMetric[];
 }
 
 export type ContentType = 'Static' | 'Carousel' | 'Reel' | 'Video' | 'Story';

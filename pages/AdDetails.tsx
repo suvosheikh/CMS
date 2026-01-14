@@ -6,7 +6,9 @@ import { AdCampaignEntry } from '../types';
 import { 
   ArrowLeft, Calendar, Clock, Target, DollarSign, 
   TrendingUp, Zap, BarChart3, 
-  Info, Globe, Monitor, Activity, ShieldCheck
+  Info, Globe, Monitor, Activity, ShieldCheck,
+  Eye, MousePointer2, UserCheck, Layers, BarChart,
+  Hash
 } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 
@@ -42,14 +44,19 @@ export const AdDetails: React.FC = () => {
     return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
   }, [ad]);
 
-  const mockChartData = useMemo(() => {
-    if (!ad) return [];
-    const points = 7;
-    const baseReach = Number(ad.reach) || 0;
-    return Array.from({ length: points }).map((_, i) => ({
-      name: `Day ${i + 1}`,
-      val: Math.floor((baseReach / points) * (i + 1) * (0.8 + Math.random() * 0.4))
-    }));
+  const chartData = useMemo(() => {
+    if (!ad || !ad.daily_metrics || ad.daily_metrics.length === 0) return [];
+    
+    // Sort and format for recharts
+    return ad.daily_metrics
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(m => ({
+        name: m.date,
+        reach: m.reach,
+        impression: m.impression,
+        result: m.result,
+        spend: m.spend
+      }));
   }, [ad]);
 
   if (loading) return (
@@ -96,102 +103,132 @@ export const AdDetails: React.FC = () => {
          </div>
       </header>
 
-      {/* KPI Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-        <div className="p-8 bg-white border border-slate-100 rounded-[3rem] shadow-sm">
-           <div className="flex items-center gap-2 mb-4">
-              <Clock size={14} className="text-blue-600" />
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Operating Duration</p>
+      {/* Campaign Summary Matrix Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+        <div className="p-7 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm group hover:border-purple-200 transition-all">
+           <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-purple-50 text-purple-600 rounded-xl group-hover:bg-purple-600 group-hover:text-white transition-all"><Target size={14} /></div>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Results</p>
            </div>
-           <p className="text-4xl font-black text-slate-900 tracking-tight">{duration} <span className="text-lg text-slate-400">Days</span></p>
+           <p className="text-3xl font-black text-slate-900 tracking-tight">{parseInt(ad.result || '0').toLocaleString()}</p>
+           <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase">{ad.primary_kpi}</p>
         </div>
 
-        <div className="p-8 bg-white border border-slate-100 rounded-[3rem] shadow-sm">
-           <div className="flex items-center gap-2 mb-4">
-              <DollarSign size={14} className="text-emerald-500" />
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Efficiency spend</p>
+        <div className="p-7 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm group hover:border-emerald-200 transition-all">
+           <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl group-hover:bg-emerald-600 group-hover:text-white transition-all"><UserCheck size={14} /></div>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Reach</p>
            </div>
-           <p className="text-4xl font-black text-emerald-600 tracking-tight">${ad.spend.toLocaleString()}</p>
-           <div className="w-full bg-slate-50 h-1.5 rounded-full mt-3 overflow-hidden">
-             <div className="bg-emerald-500 h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, budgetUtilization)}%` }}></div>
-           </div>
+           <p className="text-3xl font-black text-slate-900 tracking-tight">{ad.reach?.toLocaleString()}</p>
+           <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase">Unique Audience</p>
         </div>
 
-        <div className="p-8 bg-white border border-slate-100 rounded-[3rem] shadow-sm">
-           <div className="flex items-center gap-2 mb-4">
-              <Target size={14} className="text-purple-600" />
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Net Results ({ad.primary_kpi})</p>
+        <div className="p-7 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm group hover:border-blue-200 transition-all">
+           <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-blue-50 text-blue-600 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-all"><Eye size={14} /></div>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Impressions</p>
            </div>
-           <p className="text-4xl font-black text-slate-900 tracking-tight">{ad.result || '0'}</p>
+           <p className="text-3xl font-black text-slate-900 tracking-tight">{ad.impression?.toLocaleString()}</p>
+           <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase">Total Frequency</p>
         </div>
 
-        <div className="p-8 bg-white border border-slate-100 rounded-[3rem] shadow-sm">
-           <div className="flex items-center gap-2 mb-4">
-              <Zap size={14} className="text-amber-500" />
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Cost/Result</p>
+        <div className="p-7 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm group hover:border-slate-900 transition-all">
+           <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-slate-900 text-white rounded-xl group-hover:bg-emerald-600 transition-all"><DollarSign size={14} /></div>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Amount Spent</p>
            </div>
-           <p className="text-4xl font-black text-slate-900 tracking-tight">${costPerResult.toFixed(2)}</p>
+           <p className="text-3xl font-black text-slate-900 tracking-tight">${ad.spend.toLocaleString()}</p>
+           <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase">{budgetUtilization.toFixed(1)}% of Budget</p>
+        </div>
+
+        <div className="p-7 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm group hover:border-amber-400 transition-all">
+           <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-amber-50 text-amber-600 rounded-xl group-hover:bg-amber-600 group-hover:text-white transition-all"><Zap size={14} /></div>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Cost per Result</p>
+           </div>
+           <p className="text-3xl font-black text-slate-900 tracking-tight">${costPerResult.toFixed(2)}</p>
+           <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase">Performance Rate</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
         <div className="lg:col-span-8 bg-white p-10 rounded-[4rem] border border-slate-100 shadow-sm">
           <div className="flex items-center justify-between mb-10">
-             <h3 className="text-xl font-black text-[#0f172a] tracking-tight">Reach Matrix</h3>
-             <div className="flex gap-6">
-                <div className="text-right">
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total reach</p>
-                   <p className="text-2xl font-black text-blue-600">{ad.reach?.toLocaleString()}</p>
+             <div className="flex items-center gap-3">
+                <BarChart3 className="text-blue-600" size={20}/>
+                <h3 className="text-xl font-black text-[#0f172a] tracking-tight">Performance Flow Matrix</h3>
+             </div>
+             <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                   <div className="w-2.5 h-2.5 rounded-full bg-blue-600"></div>
+                   <span className="text-[10px] font-black text-slate-400 uppercase">Impressions</span>
                 </div>
-                <div className="text-right">
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Impressions</p>
-                   <p className="text-2xl font-black text-slate-900">{ad.impression?.toLocaleString()}</p>
+                <div className="flex items-center gap-2">
+                   <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+                   <span className="text-[10px] font-black text-slate-400 uppercase">Reach</span>
                 </div>
              </div>
           </div>
           <div className="h-[400px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={mockChartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 800}} />
-                <Tooltip contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'}} />
-                <Area type="monotone" dataKey="val" stroke="#3b82f6" strokeWidth={4} fill="#3b82f610" />
-              </AreaChart>
-            </ResponsiveContainer>
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 800}}
+                    tickFormatter={(val) => val.split('-').slice(1).join('/')}
+                  />
+                  <YAxis hide />
+                  <Tooltip 
+                    contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'}}
+                    labelStyle={{fontWeight: 'black', marginBottom: '8px', textTransform: 'uppercase', fontSize: '10px'}}
+                    itemStyle={{fontWeight: '900', fontSize: '12px'}}
+                  />
+                  <Area type="monotone" dataKey="reach" stroke="#10b981" strokeWidth={5} fill="#10b98110" name="Reach" />
+                  <Area type="monotone" dataKey="impression" stroke="#3b82f6" strokeWidth={5} fill="#3b82f610" name="Impression" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-100 text-slate-300">
+                <BarChart3 size={48} className="mb-4" />
+                <p className="text-sm font-black uppercase tracking-widest">Zero daily metrics logged for this asset.</p>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="lg:col-span-4 space-y-10">
+        <div className="lg:col-span-4 space-y-8">
           <div className="bg-slate-900 p-10 rounded-[3.5rem] text-white">
-             <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-8">Campaign Blueprint</h4>
+             <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-8 flex items-center gap-2"><Layers size={12}/> Asset Configuration</h4>
              <div className="space-y-6">
                 <div className="flex justify-between pb-4 border-b border-slate-800">
                    <span className="text-xs font-bold text-slate-400">Media Platform</span>
                    <span className="text-sm font-black">{ad.platform}</span>
                 </div>
                 <div className="flex justify-between pb-4 border-b border-slate-800">
-                   <span className="text-xs font-bold text-slate-400">Objective</span>
+                   <span className="text-xs font-bold text-slate-400">Main Objective</span>
                    <span className="text-sm font-black">{ad.primary_kpi}</span>
                 </div>
                 <div className="flex justify-between pb-4 border-b border-slate-800">
-                   <span className="text-xs font-bold text-slate-400">Start Date</span>
-                   <span className="text-sm font-black">{ad.start_date}</span>
+                   <span className="text-xs font-bold text-slate-400">Operation Duration</span>
+                   <span className="text-sm font-black">{duration} Days</span>
                 </div>
-                {ad.status === 'Completed' && (
-                  <div className="flex justify-between pb-4 border-b border-slate-800">
-                    <span className="text-xs font-bold text-slate-400">End Date</span>
-                    <span className="text-sm font-black text-emerald-400">{ad.end_date}</span>
-                  </div>
-                )}
+                <div className="flex justify-between pb-4 border-b border-slate-800">
+                   <span className="text-xs font-bold text-slate-400">Budget Cap</span>
+                   <span className="text-sm font-black text-emerald-400">${ad.total_budget.toLocaleString()}</span>
+                </div>
              </div>
           </div>
           <div className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm">
              <div className="flex items-center gap-3 mb-6 text-blue-600">
                 <Info size={18} />
-                <h4 className="text-[10px] font-black uppercase tracking-widest">Findings</h4>
+                <h4 className="text-[10px] font-black uppercase tracking-widest">Production Findings</h4>
              </div>
              <p className="text-sm font-bold text-slate-500 leading-relaxed italic">
-               "{ad.other_effects || 'No supplemental qualitative findings recorded.'}"
+               "{ad.other_effects || 'No supplemental qualitative findings have been recorded for this asset yet.'}"
              </p>
           </div>
         </div>

@@ -3,11 +3,13 @@
   =============================================================================
   🔧 FIX SQL FOR EXISTING DATABASE (DATA PRESERVATION)
   =============================================================================
-  আপনার আগের ডেটাবেসের ডেটা ঠিক রেখে লগইন সিস্টেম চালু করতে নিচের কোডটি 
+  আপনার আগের ডেটাবেসের ডেটা ঠিক রেখে লগইন এবং পাসওয়ার্ড পরিবর্তন সচল করতে নিচের কোডটি 
   Supabase SQL Editor-এ রান করুন:
 
+  -- 1. Enable Encryption Extension
   CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+  -- 2. Update Login Function
   CREATE OR REPLACE FUNCTION public.login_user(username_input text, password_input text)
   RETURNS SETOF public.users
   LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions
@@ -20,9 +22,11 @@
   END;
   $$;
 
+  -- 3. Password Hashing Trigger
   CREATE OR REPLACE FUNCTION public.hash_user_password()
   RETURNS TRIGGER AS $$
   BEGIN
+    -- Only hash if password actually changed or is new
     IF TG_OP = 'INSERT' OR (TG_OP = 'UPDATE' AND NEW.password <> OLD.password) THEN
       NEW.password := crypt(NEW.password, gen_salt('bf'));
     END IF;
@@ -34,6 +38,15 @@
   CREATE TRIGGER trigger_hash_password
   BEFORE INSERT OR UPDATE ON public.users
   FOR EACH ROW EXECUTE FUNCTION public.hash_user_password();
+
+  -- 4. Enable Row Level Security Permissions (Crucial for Profile Update)
+  ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+  DROP POLICY IF EXISTS "Allow users to update their own row" ON public.users;
+  CREATE POLICY "Allow users to update their own row" ON public.users
+    FOR UPDATE USING (true) WITH CHECK (true);
+  DROP POLICY IF EXISTS "Allow public read for login" ON public.users;
+  CREATE POLICY "Allow public read for login" ON public.users
+    FOR SELECT USING (true);
   =============================================================================
 */
 
@@ -64,7 +77,7 @@ export class DBService {
 
       if (error) {
         if (error.message.includes('function') || error.message.includes('login_user')) {
-          return { user: null, setupRequired: true, error: 'RPC function login_user is missing in this database.' };
+          return { user: null, setupRequired: true, error: 'RPC function login_user is missing.' };
         }
         return { user: null, error: error.message };
       }
@@ -79,10 +92,23 @@ export class DBService {
     }
   }
 
-  static async updatePassword(userId: string, newPass: string): Promise<boolean> {
-    if (!this.isSupabaseConfigured()) return false;
-    const { error } = await supabase.from('users').update({ password: newPass }).eq('id', userId);
-    return !error;
+  static async updatePassword(userId: string, newPass: string): Promise<{success: boolean, error?: string}> {
+    if (!this.isSupabaseConfigured()) return { success: false, error: 'Configuration missing.' };
+    
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ password: newPass })
+        .eq('id', userId);
+      
+      if (error) {
+        console.error("Supabase update error:", error);
+        return { success: false, error: error.message };
+      }
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
   }
 
   // --- FEEDBACK ---

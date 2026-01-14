@@ -156,7 +156,7 @@ const App: React.FC = () => {
                     <input 
                       type="text" required value={username} onChange={(e) => setUsername(e.target.value)}
                       className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-blue-500/5 outline-none font-bold text-sm"
-                      placeholder="Old Username"
+                      placeholder="Username or Email"
                     />
                   </div>
                 </div>
@@ -167,7 +167,7 @@ const App: React.FC = () => {
                     <input 
                       type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
                       className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-blue-500/5 outline-none font-bold text-sm"
-                      placeholder="Old Password"
+                      placeholder="Security Key"
                     />
                   </div>
                 </div>

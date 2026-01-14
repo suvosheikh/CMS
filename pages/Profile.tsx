@@ -24,18 +24,18 @@ export const Profile: React.FC = () => {
     }
 
     if (newPass.length < 3) {
-      setStatus({ type: 'error', message: 'Password too short.' });
+      setStatus({ type: 'error', message: 'Password is too short. Minimum 3 characters required.' });
       return;
     }
 
     if (user) {
-      const success = await DBService.updatePassword(user.id, newPass);
-      if (success) {
-        setStatus({ type: 'success', message: 'Security key updated successfully!' });
+      const result = await DBService.updatePassword(user.id, newPass);
+      if (result.success) {
+        setStatus({ type: 'success', message: 'Security key updated successfully! Your next login will require this new key.' });
         setNewPass('');
         setConfirmPass('');
       } else {
-        setStatus({ type: 'error', message: 'Failed to update database.' });
+        setStatus({ type: 'error', message: result.error || 'Failed to update password. Please check database permissions.' });
       }
     }
   };
