@@ -9,7 +9,8 @@ import {
   Calendar, DollarSign, Activity, Flag,
   ShieldAlert, Globe, PlayCircle, PauseCircle, Clock,
   BarChart3, LayoutList, Target, TrendingUp, AlertCircle,
-  Info, RotateCcw, Filter, PlusCircle, Calculator
+  Info, RotateCcw, Filter, PlusCircle, Calculator,
+  Loader2, Check
 } from 'lucide-react';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 
@@ -17,6 +18,7 @@ export const AdsCampaign: React.FC = () => {
   const [campaigns, setCampaigns] = useState<AdCampaignEntry[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCamp, setEditingCamp] = useState<AdCampaignEntry | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -46,7 +48,7 @@ export const AdsCampaign: React.FC = () => {
     daily_metrics: []
   });
 
-  // Daily metric form state
+  // Daily metric local form state
   const [metricDate, setMetricDate] = useState(today);
   const [metricReach, setMetricReach] = useState('');
   const [metricImpression, setMetricImpression] = useState('');
@@ -119,6 +121,7 @@ export const AdsCampaign: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  // Improved metric adding/editing logic
   const addDailyMetric = () => {
     if (!metricDate) return;
     
@@ -132,7 +135,6 @@ export const AdsCampaign: React.FC = () => {
 
     setFormData(prev => {
       const existing = prev.daily_metrics || [];
-      // Overwrite if same date exists, else add
       const filtered = existing.filter(m => m.date !== metricDate);
       const updated = [...filtered, newMetric].sort((a, b) => a.date.localeCompare(b.date));
       
@@ -151,6 +153,7 @@ export const AdsCampaign: React.FC = () => {
       };
     });
 
+    // Reset inputs
     setMetricReach('');
     setMetricImpression('');
     setMetricResult('');
@@ -185,25 +188,49 @@ export const AdsCampaign: React.FC = () => {
     });
   };
 
+  // Robust save handler to prevent glitches
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isViewer) return;
+    if (isViewer || isSaving) return;
 
-    const currentDuration = getDuration(formData);
-    const results = parseInt(formData.result || '0');
-    const cpr = results > 0 ? (Number(formData.spend) / results) : 0;
+    setIsSaving(true);
+    try {
+      const currentDuration = getDuration(formData);
+      const results = parseInt(formData.result || '0');
+      const cpr = results > 0 ? (Number(formData.spend) / results) : 0;
 
-    const camp: AdCampaignEntry = {
-      ...formData,
-      planned_duration: currentDuration,
-      cost_per_result: Number(cpr.toFixed(2)),
-      spend: formData.status === 'Planned' ? 0 : Number(formData.spend),
-      id: editingCamp ? editingCamp.id : `C-${Math.floor(1000 + Math.random() * 9000)}`,
-    } as AdCampaignEntry;
+      // Final object assembly with type safety
+      const campToSave: AdCampaignEntry = {
+        ...formData,
+        platform: formData.platform || 'Meta',
+        subject: formData.subject || '',
+        media_type: formData.media_type || 'Image',
+        primary_kpi: formData.primary_kpi || 'Traffic',
+        planned_duration: currentDuration,
+        cost_per_result: Number(cpr.toFixed(2)),
+        total_budget: Number(formData.total_budget) || 0,
+        spend: Number(formData.spend) || 0,
+        reach: Number(formData.reach) || 0,
+        impression: Number(formData.impression) || 0,
+        result: formData.result || '0',
+        status: formData.status as AdStatus,
+        id: editingCamp ? editingCamp.id : `C-${Math.floor(1000 + Math.random() * 9000)}`,
+        daily_metrics: formData.daily_metrics || []
+      } as AdCampaignEntry;
 
-    await DBService.saveAdsCampaign(camp);
-    setIsModalOpen(false);
-    fetchData();
+      await DBService.saveAdsCampaign(campToSave);
+      
+      // Artificial delay for UI smoothness
+      await new Promise(r => setTimeout(r, 500));
+      
+      setIsModalOpen(false);
+      fetchData();
+    } catch (err) {
+      console.error("Save failed:", err);
+      alert("Database sync failed. Please check your connection.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -256,6 +283,7 @@ export const AdsCampaign: React.FC = () => {
         )}
       </header>
 
+      {/* Overview KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 px-2">
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6 group hover:border-emerald-200 transition-all">
            <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-all"><DollarSign size={24} /></div>
@@ -287,6 +315,7 @@ export const AdsCampaign: React.FC = () => {
         </div>
       </div>
 
+      {/* Main Table Container */}
       <div className="bg-white rounded-[3rem] border border-slate-100 shadow-2xl shadow-slate-200/40 overflow-hidden mx-2">
         <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex flex-wrap items-center gap-6">
            <div className="relative group flex-1 max-w-md">
@@ -353,9 +382,9 @@ export const AdsCampaign: React.FC = () => {
                   </td>
                   <td className="px-8 py-8">
                     <span className={`text-[11px] font-black ${camp.status === 'Planned' ? 'text-slate-300' : 'text-emerald-600'}`}>
-                      {camp.status === 'Planned' ? '$0.00' : `$${camp.spend} Spent`}
+                      {camp.status === 'Planned' ? '$0.00' : `$${camp.spend.toLocaleString()} Spent`}
                     </span>
-                    <p className="text-[9px] font-bold text-slate-300 uppercase">Cap: ${camp.total_budget}</p>
+                    <p className="text-[9px] font-bold text-slate-300 uppercase">Cap: ${camp.total_budget.toLocaleString()}</p>
                   </td>
                   <td className="px-8 py-8 text-center">
                     <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase border shadow-sm ${
@@ -403,10 +432,10 @@ export const AdsCampaign: React.FC = () => {
                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Status: {formData.status}</p>
                   </div>
                </div>
-               <button onClick={() => setIsModalOpen(false)} className="w-12 h-12 flex items-center justify-center bg-white border border-slate-100 rounded-full text-slate-300 hover:text-slate-900 transition-all"><X size={24}/></button>
+               <button onClick={() => !isSaving && setIsModalOpen(false)} className="w-12 h-12 flex items-center justify-center bg-white border border-slate-100 rounded-full text-slate-300 hover:text-slate-900 transition-all"><X size={24}/></button>
             </div>
             
-            <form onSubmit={handleSave} className="p-10 space-y-10 overflow-y-auto max-h-[75vh]">
+            <form onSubmit={handleSave} className="p-10 space-y-10 overflow-y-auto max-h-[75vh] custom-scrollbar">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                  <div>
                     <label className={labelClass}>Operating Status</label>
@@ -486,7 +515,7 @@ export const AdsCampaign: React.FC = () => {
                       </div>
                     )}
                     <div>
-                       <label className={labelClass}>Total Planned Budget ($)</label>
+                       <label className={labelClass}>Total Project Budget ($)</label>
                        <input type="number" step="0.01" required value={formData.total_budget} onChange={e => setFormData(p => ({ ...p, total_budget: Number(e.target.value) }))} className={inputClass} />
                     </div>
                  </div>
@@ -496,31 +525,31 @@ export const AdsCampaign: React.FC = () => {
                 <div className="space-y-10 pt-8 border-t border-slate-50 animate-in slide-in-from-top-4">
                    <div className="flex items-center gap-3">
                       <TrendingUp size={14} className="text-emerald-500" />
-                      <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Performance Tracking (Daily Logs)</h4>
+                      <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Performance Feed (Daily Metrics)</h4>
                    </div>
                    
-                   {/* Daily Metric Input Grid */}
+                   {/* Daily Metric Entry Zone */}
                    <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                          <div>
-                            <label className={labelClass}>Entry Date</label>
-                            <input type="date" value={metricDate} onChange={e => setMetricDate(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold" />
+                            <label className={labelClass}>Select Date</label>
+                            <input type="date" value={metricDate} onChange={e => setMetricDate(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" />
                          </div>
                          <div>
                             <label className={labelClass}>Results</label>
-                            <input type="number" value={metricResult} onChange={e => setMetricResult(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold" placeholder="QTY" />
+                            <input type="number" value={metricResult} onChange={e => setMetricResult(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" placeholder="QTY" />
                          </div>
                          <div>
                             <label className={labelClass}>Reach</label>
-                            <input type="number" value={metricReach} onChange={e => setMetricReach(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold" placeholder="Reach" />
+                            <input type="number" value={metricReach} onChange={e => setMetricReach(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" placeholder="Unique" />
                          </div>
                          <div>
                             <label className={labelClass}>Impressions</label>
-                            <input type="number" value={metricImpression} onChange={e => setMetricImpression(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold" placeholder="Impr." />
+                            <input type="number" value={metricImpression} onChange={e => setMetricImpression(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" placeholder="Views" />
                          </div>
                          <div>
                             <label className={labelClass}>Spend ($)</label>
-                            <input type="number" step="0.01" value={metricSpend} onChange={e => setMetricSpend(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold" placeholder="Cost" />
+                            <input type="number" step="0.01" value={metricSpend} onChange={e => setMetricSpend(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" placeholder="Cost" />
                          </div>
                       </div>
                       <div className="flex justify-end pt-2">
@@ -533,7 +562,7 @@ export const AdsCampaign: React.FC = () => {
                          </button>
                       </div>
 
-                      {/* Daily List */}
+                      {/* Day Logs List */}
                       <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
                          {(formData.daily_metrics || []).map((m, idx) => (
                            <div key={idx} className="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-2xl animate-in slide-in-from-right-4 group">
@@ -569,20 +598,21 @@ export const AdsCampaign: React.FC = () => {
                          ))}
                          {(!formData.daily_metrics || formData.daily_metrics.length === 0) && (
                            <div className="py-10 text-center bg-white/50 rounded-2xl border-2 border-dashed border-slate-200">
-                              <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">No daily performance records found for this period.</p>
+                              <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">No matrix logs captured. Add daily metrics to sync totals.</p>
                            </div>
                          )}
                       </div>
                    </div>
 
-                   {/* Summary Calculation Display */}
+                   {/* Calculated Performance Grid */}
                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                      <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-3xl">
-                        <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1 block flex items-center gap-1"><Calculator size={10}/> Total Net Spend</label>
+                      <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-3xl group transition-all hover:bg-emerald-100">
+                        <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1 block flex items-center gap-1"><Calculator size={10}/> Total Spend</label>
                         <p className="text-2xl font-black text-emerald-700">${formData.spend?.toLocaleString()}</p>
+                        <p className="text-[8px] font-bold text-emerald-400 uppercase tracking-widest mt-1">Calculated From Logs</p>
                       </div>
-                      <div className="p-6 bg-purple-50 border border-purple-100 rounded-3xl relative">
-                        <label className="text-[9px] font-black text-purple-600 uppercase tracking-widest mb-1 block">Total Net Results</label>
+                      <div className="p-6 bg-purple-50 border border-purple-100 rounded-3xl relative group transition-all hover:bg-purple-100">
+                        <label className="text-[9px] font-black text-purple-600 uppercase tracking-widest mb-1 block">Net Results</label>
                         <input 
                           type="number" 
                           value={formData.result} 
@@ -590,30 +620,53 @@ export const AdsCampaign: React.FC = () => {
                           className={`w-full bg-transparent text-2xl font-black text-purple-700 outline-none border-none p-0 ${formData.daily_metrics?.length ? 'pointer-events-none opacity-100' : ''}`}
                           readOnly={(formData.daily_metrics?.length || 0) > 0}
                         />
-                        {(formData.daily_metrics?.length || 0) > 0 && <span className="absolute bottom-2 right-4 text-[7px] font-black text-purple-300 uppercase tracking-tighter">Auto-Calculated</span>}
+                        {(formData.daily_metrics?.length || 0) > 0 && <span className="absolute bottom-2 right-4 text-[7px] font-black text-purple-300 uppercase tracking-tighter">Auto-Sync</span>}
                       </div>
-                      <div className="p-6 bg-slate-900 rounded-3xl col-span-2 flex items-center justify-between text-white">
+                      <div className="p-6 bg-slate-900 rounded-3xl col-span-2 flex items-center justify-between text-white shadow-xl shadow-slate-200">
                          <div className="flex flex-col">
-                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Total Reach</span>
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Reach</span>
                             <span className="text-2xl font-black">{formData.reach?.toLocaleString()}</span>
                          </div>
                          <div className="flex flex-col text-right">
-                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Total Impressions</span>
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Impressions</span>
                             <span className="text-2xl font-black">{formData.impression?.toLocaleString()}</span>
                          </div>
                       </div>
                    </div>
 
                    <div>
-                      <label className={labelClass}>Post-Campaign Findings / Qualitative Notes</label>
-                      <textarea value={formData.other_effects} onChange={e => setFormData(p => ({ ...p, other_effects: e.target.value }))} className={`${inputClass} min-h-[120px] py-4 resize-none`} placeholder="Specific trends, demographic surprises, or creative performance notes..." />
+                      <label className={labelClass}>Insight Log / Performance Notes</label>
+                      <textarea value={formData.other_effects} onChange={e => setFormData(p => ({ ...p, other_effects: e.target.value }))} className={`${inputClass} min-h-[120px] py-4 resize-none`} placeholder="Trends, demographic insights, creative wins..." />
                    </div>
                 </div>
               )}
 
               <div className="pt-10 border-t border-slate-50 flex gap-4">
-                <button type="submit" className="flex-1 py-5 bg-blue-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl shadow-blue-100 flex items-center justify-center gap-3 active:scale-[0.98] transition-all hover:bg-blue-700"><Save size={18}/> Commit to Database</button>
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-12 py-5 bg-slate-50 text-slate-400 rounded-[2rem] font-black text-xs uppercase tracking-widest">Abort</button>
+                <button 
+                  type="submit" 
+                  disabled={isSaving}
+                  className="flex-1 py-5 bg-blue-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl shadow-blue-100 flex items-center justify-center gap-3 active:scale-[0.98] transition-all hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Syncing with Database...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={18}/>
+                      Authorize & Commit Log
+                    </>
+                  )}
+                </button>
+                <button 
+                  type="button" 
+                  disabled={isSaving}
+                  onClick={() => setIsModalOpen(false)} 
+                  className="px-12 py-5 bg-slate-50 text-slate-400 rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-colors disabled:opacity-50"
+                >
+                  Abort
+                </button>
               </div>
             </form>
           </div>
@@ -623,7 +676,7 @@ export const AdsCampaign: React.FC = () => {
       <ConfirmationModal 
         isOpen={!!deleteConfirmId}
         title="Purge Campaign?"
-        message="Permanently remove this campaign registry from the analytical records?"
+        message="Permanently remove this campaign registry from the analytical records? This action is irreversible."
         onConfirm={handleDelete}
         onCancel={() => setDeleteConfirmId(null)}
       />
