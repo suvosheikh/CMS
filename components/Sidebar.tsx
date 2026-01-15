@@ -12,7 +12,8 @@ import {
   User as UserIcon,
   Megaphone,
   BarChart3,
-  Paintbrush
+  Paintbrush,
+  Award
 } from 'lucide-react';
 import { DBService } from '../services/dbService';
 import { User } from '../types';
@@ -107,6 +108,7 @@ export const Sidebar: React.FC<{ onLogout?: () => void }> = ({ onLogout }) => {
         <NavItem to="/entry" icon={<Briefcase size={18} />} label="New Entry" isNew />
         <NavItem to="/posts" icon={<FileText size={18} />} label="Posts" badge={counts.posts} />
         <NavItem to="/categories" icon={<FolderTree size={18} />} label="Categories" badge={counts.categories} />
+        <NavItem to="/brands" icon={<Award size={18} />} label="Brand Insights" />
         <NavItem to="/campaigns" icon={<BarChart3 size={18} />} label="Reports" />
         <NavItem to="/ads" icon={<Megaphone size={18} />} label="Ads Campaign" badge={counts.ads} />
         <NavItem to="/creative-store" icon={<Paintbrush size={18} />} label="Creative Store" badge={counts.creatives} />

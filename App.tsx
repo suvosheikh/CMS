@@ -6,6 +6,7 @@ import { Header } from './components/Header';
 import { Dashboard } from './pages/Dashboard';
 import { Posts } from './pages/Posts';
 import { Categories } from './pages/Categories';
+import { BrandPosts } from './pages/BrandPosts';
 import { Entry } from './pages/Entry';
 import { UserManagement } from './pages/UserManagement';
 import { Profile } from './pages/Profile';
@@ -198,6 +199,7 @@ const App: React.FC = () => {
                 <Route path="/entry" element={<Entry />} />
                 <Route path="/posts" element={<Posts />} />
                 <Route path="/categories" element={<Categories />} />
+                <Route path="/brands" element={<BrandPosts />} />
                 <Route path="/campaigns" element={<Reports />} />
                 <Route path="/ads" element={<AdsCampaign />} />
                 <Route path="/ads/:id" element={<AdDetails />} />
