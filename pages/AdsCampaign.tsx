@@ -357,6 +357,7 @@ export const AdsCampaign: React.FC = () => {
                 <th className="px-8 py-5 text-[9px] font-black text-white uppercase tracking-widest">Channel</th>
                 <th className="px-8 py-5 text-[9px] font-black text-white uppercase tracking-widest">Subject</th>
                 <th className="px-8 py-5 text-[9px] font-black text-white uppercase tracking-widest">Objective</th>
+                <th className="px-8 py-5 text-[9px] font-black text-white uppercase tracking-widest">Start Date</th>
                 <th className="px-8 py-5 text-[9px] font-black text-white uppercase tracking-widest text-center">Duration</th>
                 <th className="px-8 py-5 text-[9px] font-black text-white uppercase tracking-widest">Budgeting</th>
                 <th className="px-8 py-5 text-[9px] font-black text-white uppercase tracking-widest text-center">Lifecycle</th>
@@ -375,6 +376,9 @@ export const AdsCampaign: React.FC = () => {
                   </td>
                   <td className="px-8 py-8">
                     <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-[9px] font-black uppercase border border-slate-200">{camp.primary_kpi}</span>
+                  </td>
+                  <td className="px-8 py-8">
+                    <span className="text-[11px] font-black text-slate-900">{camp.start_date}</span>
                   </td>
                   <td className="px-8 py-8 text-center">
                     <span className="text-[11px] font-black text-slate-900">{getDuration(camp)} Days</span>
@@ -408,7 +412,7 @@ export const AdsCampaign: React.FC = () => {
               ))}
               {filteredCampaigns.length === 0 && (
                 <tr>
-                   <td colSpan={7} className="px-8 py-24 text-center">
+                   <td colSpan={8} className="px-8 py-24 text-center">
                       <div className="flex flex-col items-center gap-4 opacity-20">
                          <LayoutList size={48} />
                          <p className="text-xs font-black uppercase tracking-[0.3em]">No records found for {isFullYearView ? `Year ${filterMonth}` : `Month ${filterMonth}`}</p>
