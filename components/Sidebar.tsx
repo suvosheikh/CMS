@@ -91,11 +91,13 @@ export const Sidebar: React.FC<{ onLogout?: () => void }> = ({ onLogout }) => {
   return (
     <div className="w-72 h-screen bg-white border-r border-slate-100 flex flex-col fixed left-0 top-0 z-50">
       <div className="p-8 flex items-center gap-3">
-        <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-xs shadow-xl shadow-blue-200">
+        <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-xs shadow-xl shadow-blue-200 shrink-0">
           CMS
         </div>
         <div className="flex flex-col">
-          <span className="font-black text-slate-800 tracking-tight leading-none text-base">RYANS</span>
+          <div className="flex items-center">
+            <img src="https://www.ryans.com/assets/images/ryans-logo.svg" alt="Ryans Logo" className="h-5 w-auto" />
+          </div>
           <span className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] mt-1">Workspace</span>
         </div>
       </div>

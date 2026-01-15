@@ -17,7 +17,7 @@ const DonutCard: React.FC<{
   <div className="bg-white p-8 pb-10 rounded-[2.5rem] shadow-sm border border-slate-50 flex flex-col relative overflow-hidden h-full group transition-all hover:shadow-xl hover:shadow-slate-200/50">
     {/* Card Header */}
     <div className="w-full flex justify-between items-center mb-6">
-      <h4 className="text-[14px] font-black text-blue-600 tracking-tight">{label}</h4>
+      <h4 className="text-[12px] font-black text-blue-600 uppercase tracking-wider">{label}</h4>
       <MoreHorizontal size={14} className="text-slate-200" />
     </div>
 
@@ -68,7 +68,7 @@ const ProgressCard: React.FC<{
 }> = ({ title, items, total }) => (
   <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-50 flex flex-col h-full">
     <div className="flex justify-between items-center mb-10">
-      <h4 className="text-[13px] font-black text-slate-800 tracking-tight">{title}</h4>
+      <h4 className="text-[11px] font-black text-blue-600 uppercase tracking-wider">{title}</h4>
       <MoreHorizontal size={14} className="text-slate-200" />
     </div>
 
@@ -166,7 +166,7 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-12 pb-20 animate-in fade-in duration-700">
-      {/* Centered Header with Icon to the Left of Text */}
+      {/* Centered Header with MARCOM Branding */}
       <header className="px-2 flex justify-center">
         <div className="flex items-center gap-6">
           {/* Boxed Icon on the Left */}
@@ -177,7 +177,7 @@ export const Dashboard: React.FC = () => {
           {/* Title and Sharpened Subtitle on the Right */}
           <div className="flex flex-col text-left">
             <h1 className="text-4xl md:text-5xl font-black text-[#0f172a] tracking-tighter leading-none mb-1.5">
-              Command Dashboard
+              MARCOM Dashboard
             </h1>
             <p className="text-slate-500 font-semibold text-sm md:text-base leading-relaxed">
               Visualizing real-time content flow and operational health.
@@ -193,7 +193,7 @@ export const Dashboard: React.FC = () => {
           value={stats.totalPosts} 
           percentage={100} 
           color="#3b82f6" 
-          subLabel="Post Published" 
+          subLabel="POST PUBLISHED" 
           exploreTo="/posts"
         />
         <DonutCard 
@@ -201,14 +201,14 @@ export const Dashboard: React.FC = () => {
           value={stats.published} 
           percentage={stats.healthPercent} 
           color="#10b981" 
-          subLabel="Published Ratio" 
+          subLabel="PUBLISHED RATIO" 
         />
         <DonutCard 
           label="Total Ads Spend" 
           value={`$${stats.totalAdsSpend.toLocaleString()}`} 
           percentage={stats.spendPercent} 
           color="#f59e0b" 
-          subLabel="Budget Utilized" 
+          subLabel="BUDGET UTILIZED" 
           exploreTo="/ads"
         />
         <DonutCard 
@@ -216,7 +216,7 @@ export const Dashboard: React.FC = () => {
           value={stats.activeCategories} 
           percentage={stats.catPercent} 
           color="#3b82f6" 
-          subLabel="Structure Active" 
+          subLabel="STRUCTURE ACTIVE" 
           exploreTo="/categories"
         />
       </div>

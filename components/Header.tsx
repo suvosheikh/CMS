@@ -51,9 +51,11 @@ export const Header: React.FC = () => {
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
-               <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">RYANS</span>
+               <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-black text-slate-400 tracking-widest">Ryans</span>
+               </div>
                <ChevronRight size={10} className="text-slate-200" />
-               <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Workspace</span>
+               <span className="text-[10px] font-black text-blue-600 tracking-widest">MarCom</span>
             </div>
             <h2 className="text-lg font-black text-slate-900 tracking-tight leading-none mt-0.5">{context.title}</h2>
           </div>
