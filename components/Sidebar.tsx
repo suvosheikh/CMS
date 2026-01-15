@@ -13,7 +13,8 @@ import {
   Megaphone,
   BarChart3,
   Paintbrush,
-  Award
+  Award,
+  BellRing
 } from 'lucide-react';
 import { DBService } from '../services/dbService';
 import { User } from '../types';
@@ -62,18 +63,19 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, isNew }) => {
 
 export const Sidebar: React.FC<{ onLogout?: () => void }> = ({ onLogout }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [counts, setCounts] = useState({ posts: 0, categories: 0, ads: 0, users: 0, creatives: 0 });
+  const [counts, setCounts] = useState({ posts: 0, categories: 0, ads: 0, users: 0, creatives: 0, reminders: 0 });
   const location = useLocation();
 
   useEffect(() => {
     const fetchData = async () => {
-      const [user, posts, cats, adCamps, users, creatives] = await Promise.all([
+      const [user, posts, cats, adCamps, users, creatives, reminders] = await Promise.all([
         DBService.getCurrentUser(), 
         DBService.getPosts(), 
         DBService.getCategories(),
         DBService.getAdsCampaigns(),
         DBService.getUsers(),
-        DBService.getCreativeLogs()
+        DBService.getCreativeLogs(),
+        DBService.getReminders()
       ]);
       setCurrentUser(user);
       setCounts({
@@ -81,7 +83,8 @@ export const Sidebar: React.FC<{ onLogout?: () => void }> = ({ onLogout }) => {
         categories: cats.length,
         ads: adCamps.length,
         users: users.length,
-        creatives: creatives.length
+        creatives: creatives.length,
+        reminders: reminders.filter(r => r.status !== 'Completed').length
       });
     };
     fetchData();
@@ -112,6 +115,7 @@ export const Sidebar: React.FC<{ onLogout?: () => void }> = ({ onLogout }) => {
         <NavItem to="/campaigns" icon={<BarChart3 size={18} />} label="Reports" />
         <NavItem to="/ads" icon={<Megaphone size={18} />} label="Ads Campaign" badge={counts.ads} />
         <NavItem to="/creative-store" icon={<Paintbrush size={18} />} label="Creative Store" badge={counts.creatives} />
+        <NavItem to="/reminders" icon={<BellRing size={18} />} label="Reminders" badge={counts.reminders} />
         {isAdmin && (
           <NavItem to="/users" icon={<Users size={18} />} label="User Access" badge={counts.users} />
         )}

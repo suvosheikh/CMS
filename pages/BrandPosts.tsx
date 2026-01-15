@@ -65,13 +65,13 @@ export const BrandPosts: React.FC = () => {
     }).map(item => ({
       ...item,
       parentName: getParentName(item.parentId)
-    })).sort((a, b) => a.name.localeCompare(b.name));
+    })).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [categories, viewLevel]);
 
   // Filter posts based on date
   const timeFilteredPosts = useMemo(() => {
     if (!filterDate) return posts;
-    return posts.filter(p => p.date.startsWith(filterDate));
+    return posts.filter(p => p.date && p.date.startsWith(filterDate));
   }, [posts, filterDate]);
 
   // Dynamic stats calculation based on view level
@@ -119,10 +119,12 @@ export const BrandPosts: React.FC = () => {
   }, [activeItems, itemStats]);
 
   const filteredDisplayItems = useMemo(() => {
+    const safeSearch = (searchTerm || '').toLowerCase();
     return activeItems.filter(item => {
       const hasContent = (itemStats[item.id] || 0) > 0;
-      const matchSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          item.parentName.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchSearch = safeSearch === '' || 
+                          (item.name || '').toLowerCase().includes(safeSearch) ||
+                          (item.parentName || '').toLowerCase().includes(safeSearch);
       return hasContent && matchSearch;
     });
   }, [activeItems, searchTerm, itemStats]);
@@ -133,7 +135,7 @@ export const BrandPosts: React.FC = () => {
       if (viewLevel === 'main') return p.main_category_id === selectedItemId;
       if (viewLevel === 'sub') return p.sub_category_id === selectedItemId;
       return p.brand_type_id === selectedItemId;
-    }).sort((a, b) => b.date.localeCompare(a.date));
+    }).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   }, [timeFilteredPosts, selectedItemId, viewLevel]);
 
   const selectedItem = useMemo(() => 
@@ -391,7 +393,7 @@ export const BrandPosts: React.FC = () => {
                        <div className="flex items-center gap-8">
                           <div className="flex flex-col items-center justify-center w-16 h-16 bg-white border border-slate-100 rounded-2xl text-slate-400 group-hover:text-blue-600 group-hover:bg-blue-50 transition-all">
                              <Calendar size={22} />
-                             <span className="text-[9px] font-black mt-1 uppercase">{post.date.split('-').slice(1).join('/')}</span>
+                             <span className="text-[9px] font-black mt-1 uppercase">{(post.date || '').split('-').slice(1).join('/')}</span>
                           </div>
                           <div>
                             <div className="flex items-center gap-3">

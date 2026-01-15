@@ -1,56 +1,5 @@
 
-/* 
-  =============================================================================
-  🔧 FIX SQL FOR EXISTING DATABASE (DATA PRESERVATION)
-  =============================================================================
-  আপনার আগের ডেটাবেসের ডেটা ঠিক রেখে লগইন এবং পাসওয়ার্ড পরিবর্তন সচল করতে নিচের কোডটি 
-  Supabase SQL Editor-এ রান করুন:
-
-  -- 1. Enable Encryption Extension
-  CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
-  -- 2. Update Login Function
-  CREATE OR REPLACE FUNCTION public.login_user(username_input text, password_input text)
-  RETURNS SETOF public.users
-  LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions
-  AS $$
-  BEGIN
-    RETURN QUERY
-    SELECT * FROM public.users
-    WHERE (name = username_input OR email = username_input)
-    AND (password = crypt(password_input, password) OR password = password_input);
-  END;
-  $$;
-
-  -- 3. Password Hashing Trigger
-  CREATE OR REPLACE FUNCTION public.hash_user_password()
-  RETURNS TRIGGER AS $$
-  BEGIN
-    -- Only hash if password actually changed or is new
-    IF TG_OP = 'INSERT' OR (TG_OP = 'UPDATE' AND NEW.password <> OLD.password) THEN
-      NEW.password := crypt(NEW.password, gen_salt('bf'));
-    END IF;
-    RETURN NEW;
-  END;
-  $$ LANGUAGE plpgsql;
-
-  DROP TRIGGER IF EXISTS trigger_hash_password ON public.users;
-  CREATE TRIGGER trigger_hash_password
-  BEFORE INSERT OR UPDATE ON public.users
-  FOR EACH ROW EXECUTE FUNCTION public.hash_user_password();
-
-  -- 4. Enable Row Level Security Permissions (Crucial for Profile Update)
-  ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-  DROP POLICY IF EXISTS "Allow users to update their own row" ON public.users;
-  CREATE POLICY "Allow users to update their own row" ON public.users
-    FOR UPDATE USING (true) WITH CHECK (true);
-  DROP POLICY IF EXISTS "Allow public read for login" ON public.users;
-  CREATE POLICY "Allow public read for login" ON public.users
-    FOR SELECT USING (true);
-  =============================================================================
-*/
-
-import { PostLog, Category, User, Role, Campaign, AdCampaignEntry, Feedback, CreativeLog, CreativeSubOption, CreativeDesigner } from '../types';
+import { PostLog, Category, User, Role, Campaign, AdCampaignEntry, Feedback, CreativeLog, CreativeSubOption, CreativeDesigner, Reminder } from '../types';
 import { supabase } from './supabase';
 
 const STORAGE_KEYS = {
@@ -110,6 +59,17 @@ export class DBService {
       return { success: false, error: err.message };
     }
   }
+
+  // --- REMINDERS ---
+  static async getReminders(): Promise<Reminder[]> {
+    if (this.isSupabaseConfigured()) {
+      const { data } = await supabase.from('reminders').select('*').order('created_at', { ascending: false });
+      return (data as Reminder[]) || [];
+    }
+    return [];
+  }
+  static async saveReminder(reminder: Reminder): Promise<void> { if (this.isSupabaseConfigured()) await supabase.from('reminders').upsert(reminder); }
+  static async deleteReminder(id: string): Promise<void> { if (this.isSupabaseConfigured()) await supabase.from('reminders').delete().eq('id', id); }
 
   // --- FEEDBACK ---
   static async getFeedback(): Promise<Feedback[]> {

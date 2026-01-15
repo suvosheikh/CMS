@@ -129,3 +129,19 @@ export interface Feedback {
   is_resolved: boolean;
   created_at: string;
 }
+
+export type ReminderStatus = 'Pending' | 'Working' | 'Completed';
+export type ReminderPriority = 'Low' | 'Medium' | 'High';
+
+export interface Reminder {
+  id: string;
+  title: string;
+  description: string;
+  due_date: string;
+  status: ReminderStatus;
+  priority: ReminderPriority;
+  created_at?: string;
+  completed_at?: string;
+  created_by_name?: string;
+  updated_by_name?: string;
+}
