@@ -120,7 +120,31 @@ export const AdsCampaign: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  // Improved metric adding/editing logic
+  // Smart Paste Handler
+  const handleSmartPaste = (e: React.ClipboardEvent) => {
+    const pastedText = e.clipboardData.getData('text');
+    // Split by lines or tabs
+    const parts = pastedText.split(/\r?\n|\t/).map(p => p.trim()).filter(p => p.length > 0);
+
+    // We expect 4 values: Results, Reach, Impressions, Spend
+    if (parts.length >= 2) {
+      e.preventDefault();
+      
+      const cleanValue = (val: string) => val.replace(/[^\d.-]/g, '');
+
+      // Assign based on the 4 values pattern
+      const results = cleanValue(parts[0]);
+      const reach = cleanValue(parts[1]);
+      const impressions = parts.length > 2 ? cleanValue(parts[2]) : '';
+      const spend = parts.length > 3 ? cleanValue(parts[3]) : '';
+
+      setMetricResult(results);
+      setMetricReach(reach);
+      if (impressions) setMetricImpression(impressions);
+      if (spend) setMetricSpend(spend);
+    }
+  };
+
   const addDailyMetric = () => {
     if (!metricDate) return;
     
@@ -162,9 +186,9 @@ export const AdsCampaign: React.FC = () => {
 
   const editDailyMetric = (metric: AdDailyMetric) => {
     setMetricDate(metric.date);
+    setMetricResult(metric.result.toString());
     setMetricReach(metric.reach.toString());
     setMetricImpression(metric.impression.toString());
-    setMetricResult(metric.result.toString());
     setMetricSpend(metric.spend.toString());
   };
 
@@ -187,7 +211,6 @@ export const AdsCampaign: React.FC = () => {
     });
   };
 
-  // Robust save handler to prevent glitches
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isViewer || isSaving) return;
@@ -198,7 +221,6 @@ export const AdsCampaign: React.FC = () => {
       const results = parseInt(formData.result || '0');
       const cpr = results > 0 ? (Number(formData.spend) / results) : 0;
 
-      // Final object assembly with type safety
       const campToSave: AdCampaignEntry = {
         ...formData,
         platform: formData.platform || 'Meta',
@@ -218,10 +240,7 @@ export const AdsCampaign: React.FC = () => {
       } as AdCampaignEntry;
 
       await DBService.saveAdsCampaign(campToSave);
-      
-      // Artificial delay for UI smoothness
       await new Promise(r => setTimeout(r, 500));
-      
       setIsModalOpen(false);
       fetchData();
     } catch (err) {
@@ -282,7 +301,6 @@ export const AdsCampaign: React.FC = () => {
         )}
       </header>
 
-      {/* Overview KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 px-2">
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6 group hover:border-emerald-200 transition-all">
            <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-all"><DollarSign size={24} /></div>
@@ -314,7 +332,6 @@ export const AdsCampaign: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Table Container */}
       <div className="bg-white rounded-[3rem] border border-slate-100 shadow-2xl shadow-slate-200/40 overflow-hidden mx-2">
         <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex flex-wrap items-center gap-6">
            <div className="relative group flex-1 max-w-md">
@@ -536,23 +553,57 @@ export const AdsCampaign: React.FC = () => {
                       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                          <div>
                             <label className={labelClass}>Select Date</label>
-                            <input type="date" value={metricDate} onChange={e => setMetricDate(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" />
+                            <input 
+                              type="date" 
+                              value={metricDate} 
+                              onChange={e => setMetricDate(e.target.value)} 
+                              onPaste={handleSmartPaste}
+                              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" 
+                            />
                          </div>
                          <div>
                             <label className={labelClass}>Results</label>
-                            <input type="number" value={metricResult} onChange={e => setMetricResult(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" placeholder="QTY" />
+                            <input 
+                              type="text" 
+                              value={metricResult} 
+                              onChange={e => setMetricResult(e.target.value)} 
+                              onPaste={handleSmartPaste}
+                              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" 
+                              placeholder="QTY" 
+                            />
                          </div>
                          <div>
                             <label className={labelClass}>Reach</label>
-                            <input type="number" value={metricReach} onChange={e => setMetricReach(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" placeholder="Unique" />
+                            <input 
+                              type="text" 
+                              value={metricReach} 
+                              onChange={e => setMetricReach(e.target.value)} 
+                              onPaste={handleSmartPaste}
+                              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" 
+                              placeholder="Unique" 
+                            />
                          </div>
                          <div>
                             <label className={labelClass}>Impressions</label>
-                            <input type="number" value={metricImpression} onChange={e => setMetricImpression(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" placeholder="Views" />
+                            <input 
+                              type="text" 
+                              value={metricImpression} 
+                              onChange={e => setMetricImpression(e.target.value)} 
+                              onPaste={handleSmartPaste}
+                              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" 
+                              placeholder="Views" 
+                            />
                          </div>
                          <div>
                             <label className={labelClass}>Spend ($)</label>
-                            <input type="number" step="0.01" value={metricSpend} onChange={e => setMetricSpend(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" placeholder="Cost" />
+                            <input 
+                              type="text" 
+                              value={metricSpend} 
+                              onChange={e => setMetricSpend(e.target.value)} 
+                              onPaste={handleSmartPaste}
+                              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" 
+                              placeholder="Cost" 
+                            />
                          </div>
                       </div>
                       <div className="flex justify-end pt-2">

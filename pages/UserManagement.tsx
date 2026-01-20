@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { DBService } from '../services/dbService';
 import { User, Role } from '../types';
 import { useNavigate } from 'react-router-dom';
-import { Users, UserPlus, Shield, Mail, Trash2, Edit2, ShieldCheck, ShieldAlert, X, Save, Lock, UserCheck, AlertTriangle } from 'lucide-react';
+import { Users, UserPlus, Shield, Mail, Trash2, Edit2, ShieldCheck, ShieldAlert, X, Save, Lock, UserCheck, Loader2 } from 'lucide-react';
 import { ROLES } from '../constants';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 
@@ -14,23 +14,31 @@ export const UserManagement: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   const [formData, setFormData] = useState<Partial<User>>({ 
     name: '', 
     email: '', 
     role: 'Viewer' as Role,
-    password: '123'
+    password: ''
   });
 
   const fetchData = async () => {
-    const [u, curr] = await Promise.all([
-      DBService.getUsers(),
-      DBService.getCurrentUser()
-    ]);
-    setUsers(u);
-    setCurrentUser(curr);
-    setLoading(false);
+    setLoading(true);
+    try {
+      const [u, curr] = await Promise.all([
+        DBService.getUsers(),
+        DBService.getCurrentUser()
+      ]);
+      setUsers(u);
+      setCurrentUser(curr);
+    } catch (err) {
+      console.error("Management data fail:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -41,13 +49,14 @@ export const UserManagement: React.FC = () => {
 
   const handleOpenModal = (user: User | null = null) => {
     if (!isAdmin) return;
+    setErrorMessage(null);
     if (user) {
       setEditingUser(user);
       setFormData({ 
         name: user.name, 
         email: user.email, 
         role: user.role, 
-        password: user.password || '' 
+        password: '' 
       });
     } else {
       setEditingUser(null);
@@ -63,19 +72,32 @@ export const UserManagement: React.FC = () => {
 
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !isAdmin) return;
+    if (!formData.name || !formData.email || !isAdmin || isSaving) return;
     
+    setErrorMessage(null);
+    setIsSaving(true);
+    
+    // Create the ID only for new users
+    const newId = `u-${Math.floor(1000 + Math.random() * 9000)}`;
+    const finalId = editingUser ? editingUser.id : newId;
+
     const user: User = {
-      id: editingUser ? editingUser.id : `u-${Math.random().toString(36).substr(2, 4)}`,
+      id: finalId,
       name: formData.name, 
       email: formData.email, 
       role: formData.role as Role, 
-      password: formData.password || '123'
-    };
+      password: formData.password || (editingUser ? editingUser.password : '123')
+    } as User;
 
-    await DBService.saveUser(user);
-    setIsModalOpen(false);
-    fetchData();
+    const result = await DBService.saveUser(user);
+    setIsSaving(false);
+
+    if (result.success) {
+      setIsModalOpen(false);
+      fetchData();
+    } else {
+      setErrorMessage(result.error || 'Check database permissions.');
+    }
   };
 
   const handleDeleteUser = async () => {
@@ -85,9 +107,14 @@ export const UserManagement: React.FC = () => {
       setDeleteConfirmId(null);
       return;
     }
-    await DBService.deleteUser(deleteConfirmId);
-    setDeleteConfirmId(null);
-    fetchData();
+    
+    const result = await DBService.deleteUser(deleteConfirmId);
+    if (result.success) {
+      setDeleteConfirmId(null);
+      fetchData();
+    } else {
+      alert(`Delete failed: ${result.error}`);
+    }
   };
 
   const getRoleBadge = (role: Role) => {
@@ -104,8 +131,9 @@ export const UserManagement: React.FC = () => {
   };
 
   if (loading) return (
-    <div className="min-h-[60vh] flex flex-col items-center justify-center">
+    <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4">
       <div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Querying User Index...</p>
     </div>
   );
 
@@ -114,6 +142,7 @@ export const UserManagement: React.FC = () => {
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 text-center">
          <div className="w-20 h-20 bg-red-50 text-red-600 rounded-[2rem] flex items-center justify-center animate-pulse"><Lock size={40} /></div>
          <h2 className="text-3xl font-black text-slate-900 tracking-tighter">Security Protocol Active</h2>
+         <p className="text-slate-500 font-medium">This module is restricted to Global Administrators only.</p>
          <button onClick={() => navigate('/')} className="px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest">Back to Dashboard</button>
       </div>
     );
@@ -126,7 +155,7 @@ export const UserManagement: React.FC = () => {
           <div className="w-11 h-11 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-blue-600 shadow-sm"><Users size={22} /></div>
           <div className="flex flex-col">
             <h1 className="text-4xl font-black text-[#0f172a] tracking-tighter leading-none">Global Governance</h1>
-            <p className="text-slate-500 font-semibold text-sm mt-1.5">Manage users and workspace access privileges.</p>
+            <p className="text-slate-500 font-semibold text-sm mt-1.5">Active directory management and privilege control.</p>
           </div>
         </div>
 
@@ -135,7 +164,7 @@ export const UserManagement: React.FC = () => {
         </button>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 px-2">
         {users.map(user => (
           <div key={user.id} className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm transition-all hover:shadow-2xl hover:shadow-slate-200/40 group relative overflow-hidden">
             <div className="absolute top-0 right-0 p-8 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -164,10 +193,20 @@ export const UserManagement: React.FC = () => {
                 <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg"><UserPlus size={24}/></div>
                 <h3 className="text-2xl font-black tracking-tighter text-slate-900">{editingUser ? 'Update Credentials' : 'Provision Identity'}</h3>
               </div>
-              <button onClick={() => setIsModalOpen(false)} className="p-3 bg-white rounded-full text-slate-300 hover:text-slate-900 transition-all border border-slate-100"><X size={24}/></button>
+              <button onClick={() => !isSaving && setIsModalOpen(false)} className="p-3 bg-white rounded-full text-slate-300 hover:text-slate-900 transition-all border border-slate-100"><X size={24}/></button>
             </div>
             
             <form onSubmit={handleSaveUser} className="p-10 space-y-8">
+              {errorMessage && (
+                <div className="p-5 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-4 text-red-600 animate-in slide-in-from-top-2">
+                   <ShieldAlert className="shrink-0 mt-0.5" size={20} />
+                   <div className="flex flex-col">
+                      <p className="text-xs font-black uppercase tracking-widest mb-1">Database Error</p>
+                      <p className="text-xs font-bold leading-tight">{errorMessage}</p>
+                   </div>
+                </div>
+              )}
+
               <div className="space-y-6">
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2.5 block">Full Identity Name</label>
@@ -179,7 +218,7 @@ export const UserManagement: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2.5 block">Security Key</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2.5 block ml-1">Security Key</label>
                     <div className="relative">
                       <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
                       <input 
@@ -187,12 +226,12 @@ export const UserManagement: React.FC = () => {
                         value={formData.password} 
                         onChange={e => setFormData(p => ({ ...p, password: e.target.value }))} 
                         className="w-full pl-12 pr-4 py-4 bg-white border border-slate-100 rounded-2xl font-bold text-sm outline-none shadow-sm focus:border-blue-500 transition-all" 
-                        placeholder="Min 3 chars" 
+                        placeholder={editingUser ? "Leave empty to keep current" : "Min 3 chars"} 
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2.5 block">Access Privilege</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2.5 block ml-1">Access Privilege</label>
                     <select value={formData.role} onChange={e => setFormData(p => ({ ...p, role: e.target.value as Role }))} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-sm outline-none">
                       {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
@@ -201,10 +240,11 @@ export const UserManagement: React.FC = () => {
               </div>
 
               <div className="flex gap-4 pt-2">
-                <button type="submit" className="flex-1 py-5 bg-blue-600 text-white rounded-[1.75rem] font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-blue-100 transition-all active:scale-[0.98]">
-                  Commit Authorization
+                <button type="submit" disabled={isSaving} className="flex-1 py-5 bg-blue-600 text-white rounded-[1.75rem] font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-blue-100 transition-all active:scale-[0.98] flex items-center justify-center gap-3">
+                  {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                  {isSaving ? 'Processing...' : 'Commit Authorization'}
                 </button>
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-8 py-5 bg-slate-50 text-slate-400 rounded-[1.75rem] font-black text-xs uppercase tracking-widest">
+                <button type="button" onClick={() => !isSaving && setIsModalOpen(false)} className="px-8 py-5 bg-slate-50 text-slate-400 rounded-[1.75rem] font-black text-xs uppercase tracking-widest">
                   Abort
                 </button>
               </div>
@@ -216,7 +256,7 @@ export const UserManagement: React.FC = () => {
       <ConfirmationModal 
         isOpen={!!deleteConfirmId}
         title="Revoke Access?"
-        message="Are you certain you wish to permanently terminate this user's identity?"
+        message="Are you certain you wish to permanently terminate this user's identity and workspace access?"
         onConfirm={handleDeleteUser}
         onCancel={() => setDeleteConfirmId(null)}
       />
