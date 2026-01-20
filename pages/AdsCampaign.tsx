@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { DBService } from '../services/dbService';
@@ -9,7 +10,7 @@ import {
   ShieldAlert, Globe, PlayCircle, PauseCircle, Clock,
   BarChart3, LayoutList, Target, TrendingUp, AlertCircle,
   Info, RotateCcw, Filter, PlusCircle, Calculator,
-  Loader2, Check
+  Loader2, Check, RefreshCw
 } from 'lucide-react';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 
@@ -92,6 +93,18 @@ export const AdsCampaign: React.FC = () => {
     return Math.max(0, days);
   };
 
+  const formatTimestamp = (iso?: string) => {
+    if (!iso) return '--';
+    try {
+      const d = new Date(iso);
+      const datePart = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
+      const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      return `${datePart} at ${timePart}`;
+    } catch (e) {
+      return '--';
+    }
+  };
+
   const handleOpenModal = (camp: AdCampaignEntry | null = null) => {
     if (isViewer) return;
     if (camp) {
@@ -123,21 +136,14 @@ export const AdsCampaign: React.FC = () => {
   // Smart Paste Handler
   const handleSmartPaste = (e: React.ClipboardEvent) => {
     const pastedText = e.clipboardData.getData('text');
-    // Split by lines or tabs
     const parts = pastedText.split(/\r?\n|\t/).map(p => p.trim()).filter(p => p.length > 0);
-
-    // We expect 4 values: Results, Reach, Impressions, Spend
     if (parts.length >= 2) {
       e.preventDefault();
-      
       const cleanValue = (val: string) => val.replace(/[^\d.-]/g, '');
-
-      // Assign based on the 4 values pattern
       const results = cleanValue(parts[0]);
       const reach = cleanValue(parts[1]);
       const impressions = parts.length > 2 ? cleanValue(parts[2]) : '';
       const spend = parts.length > 3 ? cleanValue(parts[3]) : '';
-
       setMetricResult(results);
       setMetricReach(reach);
       if (impressions) setMetricImpression(impressions);
@@ -147,7 +153,6 @@ export const AdsCampaign: React.FC = () => {
 
   const addDailyMetric = () => {
     if (!metricDate) return;
-    
     const newMetric: AdDailyMetric = {
       date: metricDate,
       reach: parseInt(metricReach) || 0,
@@ -155,17 +160,14 @@ export const AdsCampaign: React.FC = () => {
       result: parseInt(metricResult) || 0,
       spend: parseFloat(metricSpend) || 0
     };
-
     setFormData(prev => {
       const existing = prev.daily_metrics || [];
       const filtered = existing.filter(m => m.date !== metricDate);
       const updated = [...filtered, newMetric].sort((a, b) => a.date.localeCompare(b.date));
-      
       const totalReach = updated.reduce((acc, m) => acc + m.reach, 0);
       const totalImp = updated.reduce((acc, m) => acc + m.impression, 0);
       const totalResult = updated.reduce((acc, m) => acc + m.result, 0);
       const totalSpend = updated.reduce((acc, m) => acc + m.spend, 0);
-      
       return { 
         ...prev, 
         daily_metrics: updated,
@@ -175,8 +177,6 @@ export const AdsCampaign: React.FC = () => {
         spend: totalSpend
       };
     });
-
-    // Reset inputs
     setMetricReach('');
     setMetricImpression('');
     setMetricResult('');
@@ -199,7 +199,6 @@ export const AdsCampaign: React.FC = () => {
       const totalImp = updated.reduce((acc, m) => acc + m.impression, 0);
       const totalResult = updated.reduce((acc, m) => acc + m.result, 0);
       const totalSpend = updated.reduce((acc, m) => acc + m.spend, 0);
-      
       return { 
         ...prev, 
         daily_metrics: updated,
@@ -214,13 +213,11 @@ export const AdsCampaign: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isViewer || isSaving) return;
-
     setIsSaving(true);
     try {
       const currentDuration = getDuration(formData);
       const results = parseInt(formData.result || '0');
       const cpr = results > 0 ? (Number(formData.spend) / results) : 0;
-
       const campToSave: AdCampaignEntry = {
         ...formData,
         platform: formData.platform || 'Meta',
@@ -236,9 +233,9 @@ export const AdsCampaign: React.FC = () => {
         result: formData.result || '0',
         status: formData.status as AdStatus,
         id: editingCamp ? editingCamp.id : `C-${Math.floor(1000 + Math.random() * 9000)}`,
-        daily_metrics: formData.daily_metrics || []
+        daily_metrics: formData.daily_metrics || [],
+        last_updated_at: new Date().toISOString()
       } as AdCampaignEntry;
-
       await DBService.saveAdsCampaign(campToSave);
       await new Promise(r => setTimeout(r, 500));
       setIsModalOpen(false);
@@ -263,9 +260,7 @@ export const AdsCampaign: React.FC = () => {
       const matchSearch = searchTerm === '' || 
         c.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.platform?.toLowerCase().includes(searchTerm.toLowerCase());
-      
       const matchMonth = !filterMonth || (c.start_date && c.start_date.startsWith(filterMonth));
-      
       return matchSearch && matchMonth;
     });
   }, [campaigns, searchTerm, filterMonth]);
@@ -279,8 +274,14 @@ export const AdsCampaign: React.FC = () => {
 
   const inputClass = "w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 outline-none font-bold text-[13px] text-slate-700 transition-all";
   const labelClass = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2.5 block ml-1";
-
   const isFullYearView = filterMonth.length === 4;
+
+  if (loading) return (
+    <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4">
+      <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Syncing Workspace...</p>
+    </div>
+  );
 
   return (
     <div className="space-y-10 pb-20 animate-in fade-in duration-700">
@@ -377,6 +378,7 @@ export const AdsCampaign: React.FC = () => {
                 <th className="px-8 py-5 text-[9px] font-black text-white uppercase tracking-widest text-center">Duration</th>
                 <th className="px-8 py-5 text-[9px] font-black text-white uppercase tracking-widest">Budgeting</th>
                 <th className="px-8 py-5 text-[9px] font-black text-white uppercase tracking-widest text-center">Lifecycle</th>
+                <th className="px-8 py-5 text-[9px] font-black text-white uppercase tracking-widest">Update Log</th>
                 {!isViewer && <th className="px-8 py-5 text-[9px] font-black text-white uppercase tracking-widest text-right">Operations</th>}
               </tr>
             </thead>
@@ -415,6 +417,14 @@ export const AdsCampaign: React.FC = () => {
                       {camp.status}
                     </span>
                   </td>
+                  <td className="px-8 py-8">
+                    <div className="flex items-center gap-2 text-blue-500/80">
+                      <RefreshCw size={10} className="shrink-0" />
+                      <span className="text-[10px] font-black uppercase tracking-tighter whitespace-nowrap">
+                        {formatTimestamp(camp.last_updated_at)}
+                      </span>
+                    </div>
+                  </td>
                   {!isViewer && (
                     <td className="px-8 py-8">
                       <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all">
@@ -428,7 +438,7 @@ export const AdsCampaign: React.FC = () => {
               ))}
               {filteredCampaigns.length === 0 && (
                 <tr>
-                   <td colSpan={8} className="px-8 py-24 text-center">
+                   <td colSpan={9} className="px-8 py-24 text-center">
                       <div className="flex flex-col items-center gap-4 opacity-20">
                          <LayoutList size={48} />
                          <p className="text-xs font-black uppercase tracking-[0.3em]">No records found for {isFullYearView ? `Year ${filterMonth}` : `Month ${filterMonth}`}</p>
@@ -548,75 +558,35 @@ export const AdsCampaign: React.FC = () => {
                       <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Performance Feed (Daily Metrics)</h4>
                    </div>
                    
-                   {/* Daily Metric Entry Zone */}
                    <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                          <div>
                             <label className={labelClass}>Select Date</label>
-                            <input 
-                              type="date" 
-                              value={metricDate} 
-                              onChange={e => setMetricDate(e.target.value)} 
-                              onPaste={handleSmartPaste}
-                              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" 
-                            />
+                            <input type="date" value={metricDate} onChange={e => setMetricDate(e.target.value)} onPaste={handleSmartPaste} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" />
                          </div>
                          <div>
                             <label className={labelClass}>Results</label>
-                            <input 
-                              type="text" 
-                              value={metricResult} 
-                              onChange={e => setMetricResult(e.target.value)} 
-                              onPaste={handleSmartPaste}
-                              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" 
-                              placeholder="QTY" 
-                            />
+                            <input type="text" value={metricResult} onChange={e => setMetricResult(e.target.value)} onPaste={handleSmartPaste} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" placeholder="QTY" />
                          </div>
                          <div>
                             <label className={labelClass}>Reach</label>
-                            <input 
-                              type="text" 
-                              value={metricReach} 
-                              onChange={e => setMetricReach(e.target.value)} 
-                              onPaste={handleSmartPaste}
-                              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" 
-                              placeholder="Unique" 
-                            />
+                            <input type="text" value={metricReach} onChange={e => setMetricReach(e.target.value)} onPaste={handleSmartPaste} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" placeholder="Unique" />
                          </div>
                          <div>
                             <label className={labelClass}>Impressions</label>
-                            <input 
-                              type="text" 
-                              value={metricImpression} 
-                              onChange={e => setMetricImpression(e.target.value)} 
-                              onPaste={handleSmartPaste}
-                              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" 
-                              placeholder="Views" 
-                            />
+                            <input type="text" value={metricImpression} onChange={e => setMetricImpression(e.target.value)} onPaste={handleSmartPaste} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" placeholder="Views" />
                          </div>
                          <div>
                             <label className={labelClass}>Spend ($)</label>
-                            <input 
-                              type="text" 
-                              value={metricSpend} 
-                              onChange={e => setMetricSpend(e.target.value)} 
-                              onPaste={handleSmartPaste}
-                              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" 
-                              placeholder="Cost" 
-                            />
+                            <input type="text" value={metricSpend} onChange={e => setMetricSpend(e.target.value)} onPaste={handleSmartPaste} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" placeholder="Cost" />
                          </div>
                       </div>
                       <div className="flex justify-end pt-2">
-                        <button 
-                           type="button" 
-                           onClick={addDailyMetric}
-                           className="px-10 py-3.5 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-100 flex items-center justify-center gap-2 hover:bg-blue-700 active:scale-95 transition-all"
-                         >
+                        <button type="button" onClick={addDailyMetric} className="px-10 py-3.5 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-100 flex items-center justify-center gap-2 hover:bg-blue-700 active:scale-95 transition-all">
                            <PlusCircle size={14} /> Commit Entry
                          </button>
                       </div>
 
-                      {/* Day Logs List */}
                       <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
                          {(formData.daily_metrics || []).map((m, idx) => (
                            <div key={idx} className="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-2xl animate-in slide-in-from-right-4 group">
@@ -626,22 +596,10 @@ export const AdsCampaign: React.FC = () => {
                                     <span className="text-[11px] font-black text-slate-900">{m.date}</span>
                                  </div>
                                  <div className="grid grid-cols-4 gap-6 min-w-[420px]">
-                                    <div className="flex flex-col">
-                                       <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Results</span>
-                                       <span className="text-xs font-black text-purple-600">{m.result.toLocaleString()}</span>
-                                    </div>
-                                    <div className="flex flex-col">
-                                       <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Reach</span>
-                                       <span className="text-xs font-black text-emerald-600">{m.reach.toLocaleString()}</span>
-                                    </div>
-                                    <div className="flex flex-col">
-                                       <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Impr.</span>
-                                       <span className="text-xs font-black text-blue-600">{m.impression.toLocaleString()}</span>
-                                    </div>
-                                    <div className="flex flex-col">
-                                       <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Spend</span>
-                                       <span className="text-xs font-black text-slate-900">${m.spend.toLocaleString()}</span>
-                                    </div>
+                                    <div className="flex flex-col"><span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Results</span><span className="text-xs font-black text-purple-600">{m.result.toLocaleString()}</span></div>
+                                    <div className="flex flex-col"><span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Reach</span><span className="text-xs font-black text-emerald-600">{m.reach.toLocaleString()}</span></div>
+                                    <div className="flex flex-col"><span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Impr.</span><span className="text-xs font-black text-blue-600">{m.impression.toLocaleString()}</span></div>
+                                    <div className="flex flex-col"><span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Spend</span><span className="text-xs font-black text-slate-900">${m.spend.toLocaleString()}</span></div>
                                  </div>
                               </div>
                               <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
@@ -658,7 +616,6 @@ export const AdsCampaign: React.FC = () => {
                       </div>
                    </div>
 
-                   {/* Calculated Performance Grid */}
                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                       <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-3xl group transition-all hover:bg-emerald-100">
                         <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1 block flex items-center gap-1"><Calculator size={10}/> Total Spend</label>
@@ -667,24 +624,12 @@ export const AdsCampaign: React.FC = () => {
                       </div>
                       <div className="p-6 bg-purple-50 border border-purple-100 rounded-3xl relative group transition-all hover:bg-purple-100">
                         <label className="text-[9px] font-black text-purple-600 uppercase tracking-widest mb-1 block">Net Results</label>
-                        <input 
-                          type="number" 
-                          value={formData.result} 
-                          onChange={e => setFormData(p => ({ ...p, result: e.target.value }))} 
-                          className={`w-full bg-transparent text-2xl font-black text-purple-700 outline-none border-none p-0 ${formData.daily_metrics?.length ? 'pointer-events-none opacity-100' : ''}`}
-                          readOnly={(formData.daily_metrics?.length || 0) > 0}
-                        />
+                        <input type="number" value={formData.result} onChange={e => setFormData(p => ({ ...p, result: e.target.value }))} className={`w-full bg-transparent text-2xl font-black text-purple-700 outline-none border-none p-0 ${formData.daily_metrics?.length ? 'pointer-events-none opacity-100' : ''}`} readOnly={(formData.daily_metrics?.length || 0) > 0} />
                         {(formData.daily_metrics?.length || 0) > 0 && <span className="absolute bottom-2 right-4 text-[7px] font-black text-purple-300 uppercase tracking-tighter">Auto-Sync</span>}
                       </div>
                       <div className="p-6 bg-slate-900 rounded-3xl col-span-2 flex items-center justify-between text-white shadow-xl shadow-slate-200">
-                         <div className="flex flex-col">
-                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Reach</span>
-                            <span className="text-2xl font-black">{formData.reach?.toLocaleString()}</span>
-                         </div>
-                         <div className="flex flex-col text-right">
-                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Impressions</span>
-                            <span className="text-2xl font-black">{formData.impression?.toLocaleString()}</span>
-                         </div>
+                         <div className="flex flex-col"><span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Reach</span><span className="text-2xl font-black">{formData.reach?.toLocaleString()}</span></div>
+                         <div className="flex flex-col text-right"><span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Impressions</span><span className="text-2xl font-black">{formData.impression?.toLocaleString()}</span></div>
                       </div>
                    </div>
 
@@ -696,44 +641,17 @@ export const AdsCampaign: React.FC = () => {
               )}
 
               <div className="pt-10 border-t border-slate-50 flex gap-4">
-                <button 
-                  type="submit" 
-                  disabled={isSaving}
-                  className="flex-1 py-5 bg-blue-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl shadow-blue-100 flex items-center justify-center gap-3 active:scale-[0.98] transition-all hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSaving ? (
-                    <>
-                      <Loader2 size={18} className="animate-spin" />
-                      Syncing with Database...
-                    </>
-                  ) : (
-                    <>
-                      <Save size={18}/>
-                      Authorize & Commit Log
-                    </>
-                  )}
+                <button type="submit" disabled={isSaving} className="flex-1 py-5 bg-blue-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl shadow-blue-100 flex items-center justify-center gap-3 active:scale-[0.98] transition-all hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                  {isSaving ? <><Loader2 size={18} className="animate-spin" />Syncing...</> : <><Save size={18}/>Commit Log</>}
                 </button>
-                <button 
-                  type="button" 
-                  disabled={isSaving}
-                  onClick={() => setIsModalOpen(false)} 
-                  className="px-12 py-5 bg-slate-50 text-slate-400 rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-colors disabled:opacity-50"
-                >
-                  Abort
-                </button>
+                <button type="button" disabled={isSaving} onClick={() => setIsModalOpen(false)} className="px-12 py-5 bg-slate-50 text-slate-400 rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-colors disabled:opacity-50">Abort</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      <ConfirmationModal 
-        isOpen={!!deleteConfirmId}
-        title="Purge Campaign?"
-        message="Permanently remove this campaign registry from the analytical records? This action is irreversible."
-        onConfirm={handleDelete}
-        onCancel={() => setDeleteConfirmId(null)}
-      />
+      <ConfirmationModal isOpen={!!deleteConfirmId} title="Purge Campaign?" message="Permanently remove this campaign registry? This action is irreversible." onConfirm={handleDelete} onCancel={() => setDeleteConfirmId(null)} />
     </div>
   );
 };

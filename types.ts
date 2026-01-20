@@ -50,6 +50,7 @@ export interface AdCampaignEntry {
   reach: number;
   other_effects: string;
   daily_metrics?: AdDailyMetric[];
+  last_updated_at?: string;
 }
 
 export type ContentType = 

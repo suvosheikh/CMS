@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DBService } from '../services/dbService';
@@ -7,7 +8,7 @@ import {
   TrendingUp, Zap, BarChart3, 
   Info, Globe, Monitor, Activity, ShieldCheck,
   Eye, MousePointer2, UserCheck, Layers, BarChart,
-  Hash
+  Hash, RefreshCw
 } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 
@@ -46,7 +47,6 @@ export const AdDetails: React.FC = () => {
   const chartData = useMemo(() => {
     if (!ad || !ad.daily_metrics || ad.daily_metrics.length === 0) return [];
     
-    // Sort and format for recharts
     return ad.daily_metrics
       .sort((a, b) => a.date.localeCompare(b.date))
       .map(m => ({
@@ -57,6 +57,19 @@ export const AdDetails: React.FC = () => {
         spend: m.spend
       }));
   }, [ad]);
+
+  const formatTimestamp = (iso?: string) => {
+    if (!iso) return 'Pending First Sync';
+    try {
+      const d = new Date(iso);
+      // Format: 20 Jan 25 at 6:25 PM
+      const datePart = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
+      const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      return `${datePart} at ${timePart}`;
+    } catch (e) {
+      return 'Sync Error';
+    }
+  };
 
   if (loading) return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center">
@@ -200,7 +213,7 @@ export const AdDetails: React.FC = () => {
         </div>
 
         <div className="lg:col-span-4 space-y-8">
-          <div className="bg-slate-900 p-10 rounded-[3.5rem] text-white">
+          <div className="bg-slate-900 p-10 rounded-[3.5rem] text-white shadow-2xl shadow-slate-200">
              <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-8 flex items-center gap-2"><Layers size={12}/> Asset Configuration</h4>
              <div className="space-y-6">
                 <div className="flex justify-between pb-4 border-b border-slate-800">
@@ -218,6 +231,19 @@ export const AdDetails: React.FC = () => {
                 <div className="flex justify-between pb-4 border-b border-slate-800">
                    <span className="text-xs font-bold text-slate-400">Budget Cap</span>
                    <span className="text-sm font-black text-emerald-400">${ad.total_budget.toLocaleString()}</span>
+                </div>
+                
+                {/* Visual Fix: Highlighting the Last Updated Info */}
+                <div className="flex items-start gap-4 pt-4 bg-slate-800/40 p-4 rounded-2xl border border-slate-800">
+                   <div className="w-10 h-10 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center text-blue-400 shrink-0">
+                      <RefreshCw size={18} />
+                   </div>
+                   <div className="flex flex-col">
+                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.15em] mb-1">Last Update Log</span>
+                      <span className="text-xs font-black text-blue-400 leading-none">
+                         {formatTimestamp(ad.last_updated_at)}
+                      </span>
+                   </div>
                 </div>
              </div>
           </div>
