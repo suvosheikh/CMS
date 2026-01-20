@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PostLog, Category, Campaign, User } from '../types';
-import { CONTENT_TYPES, CONTENT_TAGS, POST_STATUSES } from '../constants';
 import { DBService } from '../services/dbService';
+import { CONTENT_TYPES, CONTENT_TAGS } from '../constants';
 import { 
   Save, CheckCircle, Sparkles, X, Plus, 
   Briefcase, ShieldAlert, Calendar, Layers, 
@@ -21,8 +20,8 @@ export const Entry: React.FC = () => {
   const [formData, setFormData] = useState<any>({
     id: `P-${Math.floor(1000 + Math.random() * 9000)}`,
     date: new Date().toISOString().split('T')[0],
-    content_type: 'Static',
-    content_tag: 'Offer',
+    content_type: CONTENT_TYPES[0],
+    content_tag: CONTENT_TAGS[0],
     status: 'Planned',
     main_category_id: '',
     sub_category_id: '',
@@ -53,13 +52,10 @@ export const Entry: React.FC = () => {
 
   const addModel = () => {
     if (!tempModel.trim() || isViewer) return;
-    
-    // Split by comma, trim whitespace, remove empty entries, and prevent duplicates
     const incomingModels = tempModel
       .split(',')
       .map(m => m.trim())
       .filter(m => m !== '' && !uiModels.includes(m));
-    
     if (incomingModels.length > 0) {
       setUiModels(prev => [...prev, ...incomingModels]);
     }
@@ -110,7 +106,6 @@ export const Entry: React.FC = () => {
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 text-center">
         <div className="p-6 bg-amber-50 text-amber-600 rounded-full shadow-inner"><ShieldAlert size={48} /></div>
         <h2 className="text-3xl font-black text-slate-900 tracking-tighter">Access Restriction</h2>
-        <p className="text-slate-500 font-medium max-w-sm">The Viewer role is strictly restricted to observational access. Submission features are locked.</p>
         <button onClick={() => navigate('/posts')} className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-slate-200 transition-all hover:bg-slate-800 active:scale-95">View Active Repository</button>
       </div>
     );
@@ -121,7 +116,6 @@ export const Entry: React.FC = () => {
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 animate-in fade-in zoom-in-95">
         <div className="p-8 bg-blue-50 text-blue-600 rounded-[2.5rem] animate-bounce shadow-lg"><CheckCircle size={64} strokeWidth={2.5} /></div>
         <h2 className="text-3xl font-black text-slate-900 tracking-tighter">Log Captured!</h2>
-        <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Syncing with global repository...</p>
       </div>
     );
   }
@@ -135,7 +129,7 @@ export const Entry: React.FC = () => {
           </div>
           <div className="flex flex-col">
             <h1 className="text-4xl font-black text-[#0f172a] tracking-tighter leading-none">Content Injection</h1>
-            <p className="text-slate-500 font-semibold text-sm mt-1.5 leading-relaxed flex items-center gap-2">
+            <p className="text-slate-500 font-semibold text-sm mt-1.5 leading-relaxed">
               Provisioning entry <span className="text-blue-600 font-black">{formData.id}</span> into workspace logs.
             </p>
           </div>
@@ -145,7 +139,6 @@ export const Entry: React.FC = () => {
       <div className="bg-white rounded-[3.5rem] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
         <form onSubmit={handleSubmit} className="p-12 space-y-12">
           
-          {/* Section: Timing & Hierarchy */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
             <div className="space-y-8">
               <div className="flex items-center gap-3 pb-3 border-b border-slate-50">
@@ -162,7 +155,9 @@ export const Entry: React.FC = () => {
                 <div>
                   <label className={labelClass}>Workflow Stage</label>
                   <select name="status" value={formData.status} onChange={handleChange} className={inputClass}>
-                    {POST_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                    <option value="Planned">Planned</option>
+                    <option value="Designed">Designed</option>
+                    <option value="Published">Published</option>
                   </select>
                 </div>
               </div>
@@ -194,7 +189,6 @@ export const Entry: React.FC = () => {
             </div>
           </div>
 
-          {/* Section: Product & Creative Specs */}
           <div className="space-y-8 pt-6">
             <div className="flex items-center gap-3 pb-3 border-b border-slate-50">
               <div className="w-1.5 h-4 bg-amber-500 rounded-full"></div>
@@ -214,13 +208,17 @@ export const Entry: React.FC = () => {
                <div>
                   <label className={labelClass}>Content Format</label>
                   <select name="content_type" value={formData.content_type} onChange={handleChange} className={inputClass}>
-                    {CONTENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    {CONTENT_TYPES.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
                   </select>
                </div>
                <div>
                   <label className={labelClass}>Strategic Goal</label>
                   <select name="content_tag" value={formData.content_tag} onChange={handleChange} className={inputClass}>
-                    {CONTENT_TAGS.map(t => <option key={t} value={t}>{t}</option>)}
+                    {CONTENT_TAGS.map(tag => (
+                      <option key={tag} value={tag}>{tag}</option>
+                    ))}
                   </select>
                </div>
             </div>
@@ -234,7 +232,7 @@ export const Entry: React.FC = () => {
                       onChange={(e) => setTempModel(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addModel())}
                       className={inputClass} 
-                      placeholder="e.g. ASUS TUF F15, Katana 15 (Enter to add)" 
+                      placeholder="e.g. ASUS TUF F15 (Enter to add)" 
                     />
                     <button 
                       type="button"
@@ -244,21 +242,13 @@ export const Entry: React.FC = () => {
                       <Plus size={20} />
                     </button>
                   </div>
-                  <p className="text-[10px] font-bold text-slate-400 mt-2.5 ml-1 italic">
-                    Tip: Separate multiple models with commas to add in bulk.
-                  </p>
                   <div className="flex flex-wrap gap-2.5 mt-4 min-h-[44px]">
                     {uiModels.map((m, idx) => (
                       <div key={idx} className="flex items-center gap-2 bg-blue-50 text-blue-700 border border-blue-100 px-4 py-2 rounded-2xl animate-in zoom-in-90">
                         <span className="text-[12px] font-black">{m}</span>
-                        <button type="button" onClick={() => removeModel(idx)} className="hover:text-red-500 transition-colors">
-                          <X size={14} />
-                        </button>
+                        <button type="button" onClick={() => removeModel(idx)} className="hover:text-red-500 transition-colors"><X size={14} /></button>
                       </div>
                     ))}
-                    {uiModels.length === 0 && (
-                      <p className="text-[11px] font-bold text-slate-300 italic py-2">No product models linked to this post yet.</p>
-                    )}
                   </div>
                </div>
 
@@ -272,35 +262,6 @@ export const Entry: React.FC = () => {
             </div>
           </div>
 
-          {/* Section: Assets & Notes */}
-          <div className="space-y-8 pt-6">
-            <div className="flex items-center gap-3 pb-3 border-b border-slate-50">
-              <div className="w-1.5 h-4 bg-purple-500 rounded-full"></div>
-              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-800 flex items-center gap-2">
-                 <LinkIcon size={14} className="text-purple-500" /> Production Repository
-              </h3>
-            </div>
-            
-            <div className="space-y-6">
-              <div>
-                <label className={labelClass}>Asset Storage Link</label>
-                <div className="relative">
-                  <LinkIcon size={16} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300" />
-                  <input name="asset_link" value={formData.asset_link} onChange={handleChange} className={`${inputClass} pl-12`} placeholder="https://drive.google.com/drive/folders/..." />
-                </div>
-              </div>
-
-              <div>
-                <label className={labelClass}>Production Notes</label>
-                <div className="relative">
-                  <FileText size={16} className="absolute left-5 top-6 text-slate-300" />
-                  <textarea name="notes" value={formData.notes} onChange={handleChange} rows={4} className={`${inputClass} pl-12 resize-none min-h-[120px]`} placeholder="Specify technical requirements, designer instructions, or variant notes..." />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Form Actions */}
           <div className="flex gap-6 pt-12 border-t border-slate-50">
             <button 
               type="submit" 

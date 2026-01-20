@@ -1,4 +1,3 @@
-
 export type Role = 'Admin' | 'Editor' | 'Viewer';
 
 export interface User {
@@ -52,16 +51,21 @@ export interface AdCampaignEntry {
   daily_metrics?: AdDailyMetric[];
 }
 
-export type ContentType = 'Static' | 'Carousel' | 'Reel' | 'Video' | 'Story';
+export type ContentType = 
+  | 'Static' 
+  | 'Carousel' 
+  | 'Reel' 
+  | 'Video' 
+  | 'Story';
 
 export type ContentTag = 
-  | 'Offer' 
-  | 'Launch' 
-  | 'Feature Highlight' 
-  | 'Comparison' 
-  | 'Tips' 
-  | 'Review' 
-  | 'Setup Build';
+  | 'Offer'
+  | 'Launch'
+  | 'Feature Highlight'
+  | 'Review'
+  | 'Tips'
+  | 'Gift Handover'
+  | 'Branding';
 
 export type PostStatus = 'Planned' | 'Designed' | 'Published';
 

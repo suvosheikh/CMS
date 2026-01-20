@@ -1,10 +1,10 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { DBService } from '../services/dbService';
 import { PostLog, Category, AdCampaignEntry } from '../types';
-import { MoreHorizontal, Activity, ChevronRight, LayoutDashboard } from 'lucide-react';
+import { CONTENT_TAGS, CONTENT_TYPES } from '../constants';
+import { MoreHorizontal, Activity, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 
 const DonutCard: React.FC<{ 
   label: string, 
@@ -14,20 +14,18 @@ const DonutCard: React.FC<{
   subLabel: string,
   exploreTo?: string
 }> = ({ label, value, percentage, color, subLabel, exploreTo }) => (
-  <div className="bg-white p-8 pb-10 rounded-[2.5rem] shadow-sm border border-slate-50 flex flex-col relative overflow-hidden h-full group transition-all hover:shadow-xl hover:shadow-slate-200/50">
-    {/* Card Header */}
-    <div className="w-full flex justify-between items-center mb-6">
-      <h4 className="text-[12px] font-black text-blue-600 uppercase tracking-wider">{label}</h4>
+  <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-50 flex flex-col relative overflow-hidden h-full group transition-all hover:shadow-xl hover:shadow-slate-200/50">
+    <div className="w-full flex justify-between items-center mb-4">
+      <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{label}</h4>
       <MoreHorizontal size={14} className="text-slate-200" />
     </div>
 
-    {/* Donut Section */}
-    <div className="relative w-36 h-36 mb-10 mx-auto">
+    <div className="relative w-28 h-28 mb-6 mx-auto">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
             data={[{ value: percentage }, { value: 100 - percentage }]}
-            innerRadius={45} outerRadius={55} paddingAngle={0} dataKey="value" startAngle={90} endAngle={-270} stroke="none"
+            innerRadius={35} outerRadius={42} paddingAngle={0} dataKey="value" startAngle={90} endAngle={-270} stroke="none"
           >
             <Cell fill={color} />
             <Cell fill={`${color}10`} />
@@ -35,63 +33,88 @@ const DonutCard: React.FC<{
         </PieChart>
       </ResponsiveContainer>
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-2xl font-black text-blue-600">{percentage}%</span>
+        <span className="text-xl font-black text-blue-600">{percentage}%</span>
       </div>
     </div>
 
-    {/* Card Footer Info */}
     <div className="flex justify-between items-end w-full mt-auto">
       <div className="text-left">
-        <p className="text-3xl font-black text-slate-900 tracking-tighter leading-none">{value}</p>
-        <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.1em] mt-2">{subLabel}</p>
+        <p className="text-2xl font-black text-slate-900 tracking-tighter leading-none">{value}</p>
+        <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.1em] mt-1.5">{subLabel}</p>
       </div>
       
       {exploreTo && (
         <Link 
           to={exploreTo} 
-          className="flex items-center gap-1 text-blue-600 font-black text-[11px] opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0"
+          className="flex items-center gap-1 text-blue-600 font-black text-[10px] opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-1 group-hover:translate-y-0"
         >
-          Explore <ChevronRight size={14} strokeWidth={3} />
+          Explore <ChevronRight size={12} strokeWidth={3} />
         </Link>
       )}
     </div>
     
-    {/* Bottom Accent Bar */}
-    <div className={`absolute bottom-0 left-0 right-0 h-1.5`} style={{ backgroundColor: color }}></div>
+    <div className={`absolute bottom-0 left-0 right-0 h-1`} style={{ backgroundColor: color }}></div>
   </div>
 );
 
 const ProgressCard: React.FC<{ 
   title: string, 
   items: { label: string, value: number, color: string }[], 
-  total: number 
-}> = ({ title, items, total }) => (
-  <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-50 flex flex-col h-full">
-    <div className="flex justify-between items-center mb-10">
-      <h4 className="text-[11px] font-black text-blue-600 uppercase tracking-wider">{title}</h4>
-      <MoreHorizontal size={14} className="text-slate-200" />
-    </div>
+  total: number,
+  isAdsCard?: boolean
+}> = ({ title, items, total, isAdsCard }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const initialLimit = 5;
+  const hasMore = items.length > initialLimit;
+  const displayedItems = isExpanded ? items : items.slice(0, initialLimit);
 
-    <div className="space-y-6 flex-1">
-      {items.map((item, idx) => (
-        <div key={idx} className="flex items-center justify-between gap-6">
-          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest w-24 truncate">{item.label}</span>
-          <div className="flex-1 h-2 bg-slate-50 rounded-full overflow-hidden">
-            <div 
-              className="h-full rounded-full transition-all duration-1000" 
-              style={{ width: `${total > 0 ? (item.value / total) * 100 : 0}%`, backgroundColor: item.color }}
-            />
+  return (
+    <div className="bg-white p-6 pb-8 rounded-[2.5rem] shadow-sm border border-slate-50 flex flex-col h-full transition-all duration-500">
+      <div className="flex justify-between items-center mb-8">
+        <h4 className="text-[11px] font-black text-blue-600 uppercase tracking-widest">{title}</h4>
+        <MoreHorizontal size={14} className="text-slate-200" />
+      </div>
+
+      <div className="space-y-5 flex-1 px-1">
+        {displayedItems.map((item, idx) => (
+          <div key={idx} className="flex items-center justify-between gap-4">
+            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest w-20 truncate shrink-0">
+              {item.label}
+            </span>
+            <div className="flex-1 h-2 bg-slate-50 rounded-full overflow-hidden">
+              <div 
+                className="h-full rounded-full transition-all duration-1000" 
+                style={{ 
+                  width: `${total > 0 && item.value > 0 ? (item.value / total) * 100 : 0}%`, 
+                  maxWidth: '100%',
+                  backgroundColor: item.value > 0 ? item.color : '#f1f5f9' 
+                }}
+              />
+            </div>
+            <span className="text-[12px] font-black text-slate-900 w-5 text-right shrink-0">{item.value}</span>
           </div>
-          <span className="text-[11px] font-black text-slate-900 w-8 text-right">{item.value}</span>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
 
-    <div className="mt-10 pt-8 border-t border-slate-50 flex items-center justify-center">
-      <span className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">{total} Entries Total</span>
+      {hasMore && (
+        <button 
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="mt-6 flex items-center justify-center gap-2 py-1.5 w-full text-[9px] font-black text-blue-600 uppercase tracking-widest hover:text-blue-700 transition-all"
+        >
+          {isExpanded ? (
+            <>SEE LESS <ChevronUp size={12} strokeWidth={3} /></>
+          ) : (
+            <>SEE MORE <ChevronDown size={12} strokeWidth={3} /></>
+          )}
+        </button>
+      )}
+
+      <div className="mt-8 pt-6 border-t border-slate-50 flex items-center justify-center">
+        <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest opacity-80">{total} Entries Total</span>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export const Dashboard: React.FC = () => {
   const [posts, setPosts] = useState<PostLog[]>([]);
@@ -120,7 +143,6 @@ export const Dashboard: React.FC = () => {
 
     const healthPercent = totalPosts > 0 ? Math.round((published / totalPosts) * 100) : 0;
     
-    // Ads Spend Calculations
     const totalAdsSpend = ads.reduce((acc, c) => acc + (Number(c.spend) || 0), 0);
     const totalAdsBudget = ads.reduce((acc, c) => acc + (Number(c.total_budget) || 0), 0);
     const spendPercent = totalAdsBudget > 0 ? Math.round((totalAdsSpend / totalAdsBudget) * 100) : 0;
@@ -128,72 +150,65 @@ export const Dashboard: React.FC = () => {
     const activeCategories = new Set(posts.map(p => p.main_category_id)).size;
     const catPercent = categories.length > 0 ? Math.round((activeCategories / categories.length) * 100) : 0;
 
-    const creativeTypes = {
-      Static: posts.filter(p => p.content_type === 'Static').length,
-      Carousel: posts.filter(p => p.content_type === 'Carousel').length,
-      Reels: posts.filter(p => p.content_type === 'Reel').length,
-      Video: posts.filter(p => p.content_type === 'Video').length,
-      Others: posts.filter(p => !['Static', 'Carousel', 'Reel', 'Video'].includes(p.content_type)).length,
-    };
+    const dynamicTypes = CONTENT_TYPES.map(type => ({
+      label: type as string,
+      value: posts.filter(p => p.content_type === type).length,
+      color: '#3b82f6'
+    })).sort((a, b) => b.value - a.value);
 
-    const tags = {
-      Offer: posts.filter(p => p.content_tag === 'Offer').length,
-      Highlight: posts.filter(p => p.content_tag === 'Feature Highlight').length,
-      Review: posts.filter(p => p.content_tag === 'Review').length,
-      Tips: posts.filter(p => p.content_tag === 'Tips').length,
-      Others: posts.filter(p => !['Offer', 'Feature Highlight', 'Review', 'Tips'].includes(p.content_tag)).length,
-    };
+    const dynamicTags = CONTENT_TAGS.map(tag => ({
+      label: tag as string,
+      value: posts.filter(p => p.content_tag === tag).length,
+      color: '#3b82f6'
+    })).sort((a, b) => b.value - a.value);
 
-    const adObjectives = {
-      Engagement: ads.filter(a => a.primary_kpi === 'Engagement').length,
-      Sales: ads.filter(a => a.primary_kpi === 'Sale').length,
-      Traffic: ads.filter(a => a.primary_kpi === 'Traffic').length,
-    };
+    const adObjectives = [
+      { label: 'Traffic', value: ads.filter(a => a.primary_kpi === 'Traffic').length, color: '#3b82f6' },
+      { label: 'Sales', value: ads.filter(a => a.primary_kpi === 'Sale' || a.primary_kpi === 'Sales').length, color: '#3b82f6' },
+      { label: 'Engagement', value: ads.filter(a => a.primary_kpi === 'Engagement').length, color: '#3b82f6' },
+      { label: 'Lead Gen', value: ads.filter(a => a.primary_kpi === 'Lead Gen').length, color: '#3b82f6' },
+      { label: 'Awareness', value: ads.filter(a => a.primary_kpi === 'Awareness').length, color: '#3b82f6' },
+    ].sort((a, b) => b.value - a.value);
 
     return { 
       totalPosts, published, designed, plannedPosts, 
       healthPercent, totalAdsSpend, spendPercent, activeCategories, catPercent,
-      creativeTypes, tags, adObjectives, totalAds: ads.length
+      dynamicTypes, dynamicTags, adObjectives, totalAds: ads.length
     };
   }, [posts, ads, categories]);
 
   if (loading) return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center">
-      <div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Compiling Command Data...</p>
+      <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Syncing Intelligence...</p>
     </div>
   );
 
   return (
-    <div className="space-y-12 pb-20 animate-in fade-in duration-700">
-      {/* Centered Header with MARCOM Branding */}
+    <div className="space-y-8 pb-16 animate-in fade-in duration-700">
       <header className="px-2 flex justify-center">
-        <div className="flex items-center gap-6">
-          {/* Boxed Icon on the Left */}
-          <div className="w-12 h-12 bg-white border border-slate-200 rounded-2xl flex items-center justify-center text-blue-600 shadow-sm shrink-0">
-            <Activity size={24} />
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-blue-600 shadow-sm shrink-0">
+            <Activity size={20} />
           </div>
-          
-          {/* Title and Sharpened Subtitle on the Right */}
           <div className="flex flex-col text-left">
-            <h1 className="text-4xl md:text-5xl font-black text-[#0f172a] tracking-tighter leading-none mb-1.5">
-              MARCOM Dashboard
+            <h1 className="text-3xl font-black text-[#0f172a] tracking-tight leading-none mb-1">
+              MARCOM Intelligence
             </h1>
-            <p className="text-slate-500 font-semibold text-sm md:text-base leading-relaxed">
-              Visualizing real-time content flow and operational health.
+            <p className="text-slate-500 font-semibold text-xs leading-relaxed">
+              Consolidated real-time operational health and content flow.
             </p>
           </div>
         </div>
       </header>
 
-      {/* Row 1: Donut Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <DonutCard 
           label="Total Post" 
           value={stats.totalPosts} 
           percentage={100} 
           color="#3b82f6" 
-          subLabel="POST PUBLISHED" 
+          subLabel="GLOBAL ENTRIES" 
           exploreTo="/posts"
         />
         <DonutCard 
@@ -216,13 +231,12 @@ export const Dashboard: React.FC = () => {
           value={stats.activeCategories} 
           percentage={stats.catPercent} 
           color="#3b82f6" 
-          subLabel="STRUCTURE ACTIVE" 
+          subLabel="ACTIVE SEGMENTS" 
           exploreTo="/categories"
         />
       </div>
 
-      {/* Row 2: Progress Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 items-start">
         <ProgressCard 
           title="Lifecycle Mix" 
           total={stats.totalPosts}
@@ -235,33 +249,18 @@ export const Dashboard: React.FC = () => {
         <ProgressCard 
           title="Creative Format" 
           total={stats.totalPosts}
-          items={[
-            { label: 'Static', value: stats.creativeTypes.Static, color: '#3b82f6' },
-            { label: 'Carousel', value: stats.creativeTypes.Carousel, color: '#10b981' },
-            { label: 'Reels', value: stats.creativeTypes.Reels, color: '#f1f5f9' },
-            { label: 'Video', value: stats.creativeTypes.Video, color: '#f1f5f9' },
-            { label: 'Others', value: stats.creativeTypes.Others, color: '#f1f5f9' },
-          ]}
+          items={stats.dynamicTypes}
         />
         <ProgressCard 
           title="Strategic Tag" 
           total={stats.totalPosts}
-          items={[
-            { label: 'Offer', value: stats.tags.Offer, color: '#3b82f6' },
-            { label: 'Feature Highlight', value: stats.tags.Highlight, color: '#10b981' },
-            { label: 'Review', value: stats.tags.Review, color: '#f1f5f9' },
-            { label: 'Tips', value: stats.tags.Tips, color: '#f1f5f9' },
-            { label: 'Others', value: stats.tags.Others, color: '#f1f5f9' },
-          ]}
+          items={stats.dynamicTags}
         />
         <ProgressCard 
           title="Running Ads Campaign" 
           total={stats.totalAds}
-          items={[
-            { label: 'Engagement', value: stats.adObjectives.Engagement, color: '#3b82f6' },
-            { label: 'Sales', value: stats.adObjectives.Sales, color: '#10b981' },
-            { label: 'Traffic', value: stats.adObjectives.Traffic, color: '#f1f5f9' },
-          ]}
+          items={stats.adObjectives}
+          isAdsCard
         />
       </div>
     </div>

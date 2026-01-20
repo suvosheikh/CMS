@@ -2,9 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { DBService } from '../services/dbService';
 import { User, Role } from '../types';
+import { useNavigate } from 'react-router-dom';
 import { Users, UserPlus, Shield, Mail, Trash2, Edit2, ShieldCheck, ShieldAlert, X, Save, Lock, UserCheck, AlertTriangle } from 'lucide-react';
 import { ROLES } from '../constants';
-import { useNavigate } from 'react-router-dom';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 
 export const UserManagement: React.FC = () => {
@@ -81,7 +81,7 @@ export const UserManagement: React.FC = () => {
   const handleDeleteUser = async () => {
     if (!isAdmin || !deleteConfirmId) return;
     if (deleteConfirmId === currentUser?.id) {
-      alert("Self-deletion protocol blocked. Another admin must revoke your access.");
+      alert("Self-deletion protocol blocked.");
       setDeleteConfirmId(null);
       return;
     }
@@ -113,10 +113,7 @@ export const UserManagement: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 text-center">
          <div className="w-20 h-20 bg-red-50 text-red-600 rounded-[2rem] flex items-center justify-center animate-pulse"><Lock size={40} /></div>
-         <div>
-            <h2 className="text-3xl font-black text-slate-900 tracking-tighter">Security Protocol Active</h2>
-            <p className="text-slate-500 font-medium max-w-sm mt-2">Only system administrators can modify security identities. Access to this sector is strictly restricted.</p>
-         </div>
+         <h2 className="text-3xl font-black text-slate-900 tracking-tighter">Security Protocol Active</h2>
          <button onClick={() => navigate('/')} className="px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest">Back to Dashboard</button>
       </div>
     );
@@ -128,10 +125,11 @@ export const UserManagement: React.FC = () => {
         <div className="flex items-center gap-5">
           <div className="w-11 h-11 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-blue-600 shadow-sm"><Users size={22} /></div>
           <div className="flex flex-col">
-            <h1 className="text-4xl font-black text-[#0f172a] tracking-tighter leading-none">Team Governance</h1>
-            <p className="text-slate-500 font-semibold text-sm mt-1.5">Managing {users.length} active workspace credentials.</p>
+            <h1 className="text-4xl font-black text-[#0f172a] tracking-tighter leading-none">Global Governance</h1>
+            <p className="text-slate-500 font-semibold text-sm mt-1.5">Manage users and workspace access privileges.</p>
           </div>
         </div>
+
         <button onClick={() => handleOpenModal()} className="flex items-center gap-2 px-8 py-3.5 bg-[#2563eb] text-white rounded-2xl hover:bg-blue-700 font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-blue-100 active:scale-95">
           <UserPlus size={18} strokeWidth={3} /> Provision Identity
         </button>
@@ -202,13 +200,6 @@ export const UserManagement: React.FC = () => {
                 </div>
               </div>
 
-              <div className="p-6 bg-blue-50 border border-blue-100 rounded-[2rem] flex gap-4">
-                <AlertTriangle size={20} className="text-blue-600 shrink-0" />
-                <p className="text-[11px] font-bold text-blue-700 leading-relaxed">
-                  As an Admin, you are overwriting this user's security credentials. They must use this new key immediately.
-                </p>
-              </div>
-
               <div className="flex gap-4 pt-2">
                 <button type="submit" className="flex-1 py-5 bg-blue-600 text-white rounded-[1.75rem] font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-blue-100 transition-all active:scale-[0.98]">
                   Commit Authorization
@@ -225,7 +216,7 @@ export const UserManagement: React.FC = () => {
       <ConfirmationModal 
         isOpen={!!deleteConfirmId}
         title="Revoke Access?"
-        message="Are you certain you wish to permanently terminate this user's identity and access to the dashboard? This cannot be undone."
+        message="Are you certain you wish to permanently terminate this user's identity?"
         onConfirm={handleDeleteUser}
         onCancel={() => setDeleteConfirmId(null)}
       />

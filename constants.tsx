@@ -1,17 +1,22 @@
-
 import React from 'react';
 import { ContentType, ContentTag, PostStatus, CreativePlatform, CreativeMedium } from './types';
 
-export const CONTENT_TYPES: ContentType[] = ['Static', 'Carousel', 'Reel', 'Video', 'Story'];
+export const CONTENT_TYPES: ContentType[] = [
+  'Static', 
+  'Carousel', 
+  'Reel', 
+  'Video', 
+  'Story'
+];
 
 export const CONTENT_TAGS: ContentTag[] = [
   'Offer',
   'Launch',
   'Feature Highlight',
-  'Comparison',
-  'Tips',
   'Review',
-  'Setup Build'
+  'Tips',
+  'Gift Handover',
+  'Branding'
 ];
 
 export const POST_STATUSES: PostStatus[] = ['Planned', 'Designed', 'Published'];

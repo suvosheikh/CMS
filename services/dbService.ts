@@ -167,15 +167,22 @@ export class DBService {
     }
     return [];
   }
+
   static async getAdsCampaignById(id: string): Promise<AdCampaignEntry | null> {
     if (this.isSupabaseConfigured()) {
       const { data } = await supabase.from('ads_campaigns').select('*').eq('id', id).maybeSingle();
-      return data as AdCampaignEntry | null;
+      return (data as AdCampaignEntry) || null;
     }
     return null;
   }
-  static async saveAdsCampaign(camp: AdCampaignEntry): Promise<void> { if (this.isSupabaseConfigured()) await supabase.from('ads_campaigns').upsert(camp); }
-  static async deleteAdsCampaign(id: string): Promise<void> { if (this.isSupabaseConfigured()) await supabase.from('ads_campaigns').delete().eq('id', id); }
+
+  static async saveAdsCampaign(camp: AdCampaignEntry): Promise<void> { 
+    if (this.isSupabaseConfigured()) await supabase.from('ads_campaigns').upsert(camp); 
+  }
+
+  static async deleteAdsCampaign(id: string): Promise<void> { 
+    if (this.isSupabaseConfigured()) await supabase.from('ads_campaigns').delete().eq('id', id); 
+  }
 
   // --- USERS ---
   static async getUsers(): Promise<User[]> {
