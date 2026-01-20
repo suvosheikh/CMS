@@ -289,6 +289,7 @@ export const Posts: React.FC = () => {
                         <span className={`inline-block px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all duration-300 group-hover:shadow-md ${
                           post.status === 'Published' ? 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-emerald-50' :
                           post.status === 'Designed' ? 'bg-blue-50 text-blue-600 border-blue-100 shadow-blue-50' :
+                          post.status === 'Working' ? 'bg-amber-50 text-amber-600 border-amber-100 shadow-amber-50' :
                           'bg-slate-50 text-slate-500 border-slate-100 shadow-slate-50'
                         }`}>
                           {post.status}
@@ -365,7 +366,9 @@ export const Posts: React.FC = () => {
                        </div>
                        <div className="flex items-center gap-3">
                          <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${
-                           h.status === 'Published' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'
+                           h.status === 'Published' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                           h.status === 'Working' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                           'bg-slate-50 text-slate-400 border-slate-100'
                          }`}>
                            {h.status}
                          </span>

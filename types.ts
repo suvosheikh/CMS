@@ -1,3 +1,4 @@
+
 export type Role = 'Admin' | 'Editor' | 'Viewer';
 
 export interface User {
@@ -67,7 +68,7 @@ export type ContentTag =
   | 'Gift Handover'
   | 'Branding';
 
-export type PostStatus = 'Planned' | 'Designed' | 'Published';
+export type PostStatus = 'Planned' | 'Working' | 'Designed' | 'Published';
 
 export interface PostLog {
   id: string;

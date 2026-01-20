@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
@@ -139,6 +140,7 @@ export const Dashboard: React.FC = () => {
     const totalPosts = posts.length;
     const published = posts.filter(p => p.status === 'Published').length;
     const designed = posts.filter(p => p.status === 'Designed').length;
+    const working = posts.filter(p => p.status === 'Working').length;
     const plannedPosts = posts.filter(p => p.status === 'Planned').length;
 
     const healthPercent = totalPosts > 0 ? Math.round((published / totalPosts) * 100) : 0;
@@ -171,7 +173,7 @@ export const Dashboard: React.FC = () => {
     ].sort((a, b) => b.value - a.value);
 
     return { 
-      totalPosts, published, designed, plannedPosts, 
+      totalPosts, published, designed, working, plannedPosts, 
       healthPercent, totalAdsSpend, spendPercent, activeCategories, catPercent,
       dynamicTypes, dynamicTags, adObjectives, totalAds: ads.length
     };
@@ -241,8 +243,9 @@ export const Dashboard: React.FC = () => {
           title="Lifecycle Mix" 
           total={stats.totalPosts}
           items={[
-            { label: 'Published', value: stats.published, color: '#3b82f6' },
-            { label: 'Designed', value: stats.designed, color: '#10b981' },
+            { label: 'Published', value: stats.published, color: '#10b981' },
+            { label: 'Designed', value: stats.designed, color: '#3b82f6' },
+            { label: 'Working', value: stats.working, color: '#f59e0b' },
             { label: 'Planned', value: stats.plannedPosts, color: '#f1f5f9' },
           ]}
         />

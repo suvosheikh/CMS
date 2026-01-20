@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ContentType, ContentTag, PostStatus, CreativePlatform, CreativeMedium } from './types';
 
@@ -19,7 +20,7 @@ export const CONTENT_TAGS: ContentTag[] = [
   'Branding'
 ];
 
-export const POST_STATUSES: PostStatus[] = ['Planned', 'Designed', 'Published'];
+export const POST_STATUSES: PostStatus[] = ['Planned', 'Working', 'Designed', 'Published'];
 
 export const ROLES = ['Admin', 'Editor', 'Viewer'] as const;
 

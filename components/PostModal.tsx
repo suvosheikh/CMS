@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { PostLog, Category, Campaign } from '../types';
+import { PostLog, Category } from '../types';
 import { DBService } from '../services/dbService';
 import { CONTENT_TYPES, CONTENT_TAGS } from '../constants';
 import { 
   X, Save, Layers, Package, Plus, Trash2, 
   Sparkles, Calendar, Clock, Bookmark, 
-  Link as LinkIcon, FileText 
+  Link as LinkIcon, FileText, AlignLeft
 } from 'lucide-react';
 
 interface PostModalProps {
@@ -18,7 +18,6 @@ interface PostModalProps {
 
 export const PostModal: React.FC<PostModalProps> = ({ isOpen, onClose, onSave, initialData }) => {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [tempModel, setTempModel] = useState('');
   const [uiModels, setUiModels] = useState<string[]>([]);
   const [formData, setFormData] = useState<any>({
@@ -30,7 +29,6 @@ export const PostModal: React.FC<PostModalProps> = ({ isOpen, onClose, onSave, i
     sub_category_id: '',
     brand_type_id: '',
     product_model: '',
-    campaign_name: '',
     asset_link: '',
     notes: ''
   });
@@ -38,11 +36,9 @@ export const PostModal: React.FC<PostModalProps> = ({ isOpen, onClose, onSave, i
   useEffect(() => {
     if (isOpen) {
       Promise.all([
-        DBService.getCategories(),
-        DBService.getCampaigns()
-      ]).then(([cats, camps]) => {
+        DBService.getCategories()
+      ]).then(([cats]) => {
         setCategories(cats);
-        setCampaigns(camps);
 
         if (initialData) {
           const models = initialData.product_model ? initialData.product_model.split(',').map(m => m.trim()).filter(Boolean) : [];
@@ -60,7 +56,6 @@ export const PostModal: React.FC<PostModalProps> = ({ isOpen, onClose, onSave, i
             sub_category_id: '',
             brand_type_id: '',
             product_model: '',
-            campaign_name: '',
             asset_link: '',
             notes: ''
           });
@@ -128,6 +123,7 @@ export const PostModal: React.FC<PostModalProps> = ({ isOpen, onClose, onSave, i
 
         <form onSubmit={handleSubmit} className="p-10 space-y-12">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
+            {/* Timing & Status Section */}
             <div className="space-y-8">
               <div className="flex items-center gap-3 pb-3 border-b border-slate-50">
                 <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div>
@@ -142,6 +138,7 @@ export const PostModal: React.FC<PostModalProps> = ({ isOpen, onClose, onSave, i
                   <label className={labelClass}>Workflow Stage</label>
                   <select name="status" value={formData.status} onChange={handleChange} className={inputClass}>
                     <option value="Planned">Planned</option>
+                    <option value="Working">Working</option>
                     <option value="Designed">Designed</option>
                     <option value="Published">Published</option>
                   </select>
@@ -149,6 +146,7 @@ export const PostModal: React.FC<PostModalProps> = ({ isOpen, onClose, onSave, i
               </div>
             </div>
 
+            {/* Category Mapping Section */}
             <div className="space-y-8">
               <div className="flex items-center gap-3 pb-3 border-b border-slate-50">
                 <div className="w-1.5 h-4 bg-emerald-500 rounded-full"></div>
@@ -172,7 +170,8 @@ export const PostModal: React.FC<PostModalProps> = ({ isOpen, onClose, onSave, i
               </div>
             </div>
 
-            <div className="col-span-full pt-4 space-y-8">
+            {/* Content Specs */}
+            <div className="col-span-full pt-4 space-y-10">
               <div className="flex items-center gap-3 pb-3 border-b border-slate-50">
                 <div className="w-1.5 h-4 bg-amber-500 rounded-full"></div>
                 <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-800 flex items-center gap-2"><Bookmark size={14} className="text-amber-500" /> Specifications</h3>
@@ -200,6 +199,63 @@ export const PostModal: React.FC<PostModalProps> = ({ isOpen, onClose, onSave, i
                       <option key={tag} value={tag}>{tag}</option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              {/* Asset Link Field */}
+              <div>
+                <label className={labelClass}>Asset Link (URL)</label>
+                <div className="relative">
+                  <LinkIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                  <input name="asset_link" value={formData.asset_link} onChange={handleChange} placeholder="https://..." className={`${inputClass} pl-14`} />
+                </div>
+              </div>
+
+              {/* Product Model Tag Input - Now Full Width */}
+              <div>
+                <label className={labelClass}>Product Model Name(s)</label>
+                <div className="flex gap-4">
+                  <div className="relative flex-1">
+                    <FileText className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                    <input 
+                      value={tempModel}
+                      onChange={(e) => setTempModel(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addModel())}
+                      className={`${inputClass} pl-14`} 
+                      placeholder="e.g. ASUS TUF F15 (Enter to add)" 
+                    />
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={addModel}
+                    className="px-8 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-all active:scale-95 flex items-center justify-center shadow-lg"
+                  >
+                    <Plus size={22} strokeWidth={3} />
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-3 mt-5 min-h-[44px]">
+                  {uiModels.map((m, idx) => (
+                    <div key={idx} className="flex items-center gap-2 bg-blue-50 text-blue-700 border border-blue-100 px-4 py-2 rounded-2xl">
+                      <span className="text-[12px] font-black">{m}</span>
+                      <button type="button" onClick={() => removeModel(idx)} className="hover:text-red-500 transition-colors"><X size={14} /></button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Notes Area */}
+              <div>
+                <label className={labelClass}>Production Notes</label>
+                <div className="relative">
+                  <AlignLeft className="absolute left-5 top-5 text-slate-300" size={18} />
+                  <textarea 
+                    name="notes" 
+                    value={formData.notes} 
+                    onChange={handleChange} 
+                    rows={4} 
+                    className={`${inputClass} pl-14 py-5 resize-none`} 
+                    placeholder="Provide additional context or requirements..."
+                  />
                 </div>
               </div>
             </div>

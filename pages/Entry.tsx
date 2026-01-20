@@ -1,18 +1,19 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PostLog, Category, Campaign, User } from '../types';
+import { PostLog, Category, User } from '../types';
 import { DBService } from '../services/dbService';
 import { CONTENT_TYPES, CONTENT_TAGS } from '../constants';
 import { 
   Save, CheckCircle, Sparkles, X, Plus, 
   Briefcase, ShieldAlert, Calendar, Layers, 
-  Bookmark, Link as LinkIcon, FileText 
+  Bookmark, Link as LinkIcon, FileText,
+  AlignLeft
 } from 'lucide-react';
 
 export const Entry: React.FC = () => {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<Category[]>([]);
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [tempModel, setTempModel] = useState('');
@@ -26,7 +27,6 @@ export const Entry: React.FC = () => {
     main_category_id: '',
     sub_category_id: '',
     brand_type_id: '',
-    campaign_name: '',
     asset_link: '',
     notes: ''
   });
@@ -34,11 +34,9 @@ export const Entry: React.FC = () => {
   useEffect(() => {
     Promise.all([
       DBService.getCategories(),
-      DBService.getCampaigns(),
       DBService.getCurrentUser()
-    ]).then(([cats, camps, user]) => {
+    ]).then(([cats, user]) => {
       setCategories(cats);
-      setCampaigns(camps);
       setCurrentUser(user);
     });
   }, []);
@@ -98,7 +96,7 @@ export const Entry: React.FC = () => {
     });
   };
 
-  const inputClass = "w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 outline-none font-semibold text-sm text-slate-700 disabled:opacity-50 disabled:bg-slate-50 transition-all duration-200 hover:border-slate-300";
+  const inputClass = "w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 outline-none font-semibold text-sm text-slate-700 disabled:opacity-50 disabled:bg-slate-50 transition-all duration-200 hover:border-slate-300 shadow-sm";
   const labelClass = "text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 mb-2.5 block";
 
   if (isViewer) {
@@ -106,7 +104,7 @@ export const Entry: React.FC = () => {
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 text-center">
         <div className="p-6 bg-amber-50 text-amber-600 rounded-full shadow-inner"><ShieldAlert size={48} /></div>
         <h2 className="text-3xl font-black text-slate-900 tracking-tighter">Access Restriction</h2>
-        <button onClick={() => navigate('/posts')} className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-slate-200 transition-all hover:bg-slate-800 active:scale-95">View Active Repository</button>
+        <button onClick={() => navigate('/posts')} className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-slate-200 transition-all hover:bg-slate-800 active:scale-95">Back to Repository</button>
       </div>
     );
   }
@@ -137,17 +135,18 @@ export const Entry: React.FC = () => {
       </header>
 
       <div className="bg-white rounded-[3.5rem] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
-        <form onSubmit={handleSubmit} className="p-12 space-y-12">
+        <form onSubmit={handleSubmit} className="p-10 md:p-14 space-y-12">
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
+            {/* Timing & Status Section */}
             <div className="space-y-8">
-              <div className="flex items-center gap-3 pb-3 border-b border-slate-50">
+              <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
                 <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div>
                 <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-800 flex items-center gap-2">
-                   <Calendar size={14} className="text-blue-600" /> Timing & Workflow
+                   <Calendar size={14} className="text-blue-600" /> Workflow Details
                 </h3>
               </div>
-              <div className="space-y-6">
+              <div className="grid grid-cols-1 gap-6">
                 <div>
                   <label className={labelClass}>Publish Date</label>
                   <input type="date" name="date" required value={formData.date} onChange={handleChange} className={inputClass} />
@@ -156,6 +155,7 @@ export const Entry: React.FC = () => {
                   <label className={labelClass}>Workflow Stage</label>
                   <select name="status" value={formData.status} onChange={handleChange} className={inputClass}>
                     <option value="Planned">Planned</option>
+                    <option value="Working">Working</option>
                     <option value="Designed">Designed</option>
                     <option value="Published">Published</option>
                   </select>
@@ -163,14 +163,15 @@ export const Entry: React.FC = () => {
               </div>
             </div>
 
+            {/* Category Section */}
             <div className="space-y-8">
-              <div className="flex items-center gap-3 pb-3 border-b border-slate-50">
+              <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
                 <div className="w-1.5 h-4 bg-emerald-500 rounded-full"></div>
                 <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-800 flex items-center gap-2">
                    <Layers size={14} className="text-emerald-500" /> Structure Mapping
                 </h3>
               </div>
-              <div className="space-y-6">
+              <div className="grid grid-cols-1 gap-6">
                 <div>
                   <label className={labelClass}>Main Category</label>
                   <select name="main_category_id" required value={formData.main_category_id} onChange={handleChange} className={inputClass}>
@@ -187,82 +188,108 @@ export const Entry: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="space-y-8 pt-6">
-            <div className="flex items-center gap-3 pb-3 border-b border-slate-50">
-              <div className="w-1.5 h-4 bg-amber-500 rounded-full"></div>
-              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-800 flex items-center gap-2">
-                 <Bookmark size={14} className="text-amber-500" /> Creative Specifications
-              </h3>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-               <div>
-                  <label className={labelClass}>Brand / Variant</label>
-                  <select name="brand_type_id" value={formData.brand_type_id} onChange={handleChange} className={inputClass} disabled={!formData.sub_category_id}>
-                    <option value="">None / N/A</option>
-                    {brandCats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-               </div>
-               <div>
-                  <label className={labelClass}>Content Format</label>
-                  <select name="content_type" value={formData.content_type} onChange={handleChange} className={inputClass}>
-                    {CONTENT_TYPES.map(type => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
-                  </select>
-               </div>
-               <div>
-                  <label className={labelClass}>Strategic Goal</label>
-                  <select name="content_tag" value={formData.content_tag} onChange={handleChange} className={inputClass}>
-                    {CONTENT_TAGS.map(tag => (
-                      <option key={tag} value={tag}>{tag}</option>
-                    ))}
-                  </select>
-               </div>
-            </div>
+            {/* Content Specifications */}
+            <div className="md:col-span-2 space-y-10 pt-4">
+              <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+                <div className="w-1.5 h-4 bg-amber-500 rounded-full"></div>
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-800 flex items-center gap-2">
+                   <Bookmark size={14} className="text-amber-500" /> Content Specifications
+                </h3>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                 <div>
+                    <label className={labelClass}>Brand / Variant</label>
+                    <select name="brand_type_id" value={formData.brand_type_id} onChange={handleChange} className={inputClass} disabled={!formData.sub_category_id}>
+                      <option value="">None / N/A</option>
+                      {brandCats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                 </div>
+                 <div>
+                    <label className={labelClass}>Content Format</label>
+                    <select name="content_type" value={formData.content_type} onChange={handleChange} className={inputClass}>
+                      {CONTENT_TYPES.map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                 </div>
+                 <div>
+                    <label className={labelClass}>Strategic Goal</label>
+                    <select name="content_tag" value={formData.content_tag} onChange={handleChange} className={inputClass}>
+                      {CONTENT_TAGS.map(tag => (
+                        <option key={tag} value={tag}>{tag}</option>
+                      ))}
+                    </select>
+                 </div>
+              </div>
 
-            <div className="space-y-6">
-               <div>
-                  <label className={labelClass}>Product Model Name(s)</label>
-                  <div className="flex gap-3">
+              {/* Asset Link Moved to top of this section area */}
+              <div>
+                <label className={labelClass}>Asset Link (URL)</label>
+                <div className="relative">
+                  <LinkIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                  <input name="asset_link" value={formData.asset_link} onChange={handleChange} placeholder="https://..." className={`${inputClass} pl-14`} />
+                </div>
+              </div>
+
+              {/* Product Model Name - Now Full Width Below */}
+              <div>
+                <label className={labelClass}>Product Model Name(s)</label>
+                <div className="flex gap-4">
+                  <div className="relative flex-1">
+                    <FileText className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                     <input 
                       value={tempModel}
                       onChange={(e) => setTempModel(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addModel())}
-                      className={inputClass} 
+                      className={`${inputClass} pl-14`} 
                       placeholder="e.g. ASUS TUF F15 (Enter to add)" 
                     />
-                    <button 
-                      type="button"
-                      onClick={addModel}
-                      className="px-8 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-all active:scale-95 flex items-center justify-center shadow-lg shadow-slate-200"
-                    >
-                      <Plus size={20} />
-                    </button>
                   </div>
-                  <div className="flex flex-wrap gap-2.5 mt-4 min-h-[44px]">
-                    {uiModels.map((m, idx) => (
-                      <div key={idx} className="flex items-center gap-2 bg-blue-50 text-blue-700 border border-blue-100 px-4 py-2 rounded-2xl animate-in zoom-in-90">
-                        <span className="text-[12px] font-black">{m}</span>
-                        <button type="button" onClick={() => removeModel(idx)} className="hover:text-red-500 transition-colors"><X size={14} /></button>
-                      </div>
-                    ))}
-                  </div>
-               </div>
+                  <button 
+                    type="button"
+                    onClick={addModel}
+                    className="px-8 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-all active:scale-95 flex items-center justify-center shadow-lg"
+                  >
+                    <Plus size={22} strokeWidth={3} />
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-3 mt-5 min-h-[44px]">
+                  {uiModels.map((m, idx) => (
+                    <div key={idx} className="flex items-center gap-2 bg-blue-50 text-blue-700 border border-blue-100 px-4 py-2 rounded-2xl animate-in zoom-in-90">
+                      <span className="text-[12px] font-black">{m}</span>
+                      <button type="button" onClick={() => removeModel(idx)} className="hover:text-red-500 transition-colors"><X size={14} /></button>
+                    </div>
+                  ))}
+                  {uiModels.length === 0 && (
+                    <p className="text-[11px] font-bold text-slate-300 italic flex items-center gap-2 ml-2">
+                      No models linked yet.
+                    </p>
+                  )}
+                </div>
+              </div>
 
-               <div>
-                  <label className={labelClass}>Active Campaign Anchor</label>
-                  <select name="campaign_name" value={formData.campaign_name} onChange={handleChange} className={inputClass}>
-                    <option value="">General / No Campaign</option>
-                    {campaigns.map(camp => <option key={camp.id} value={camp.subject}>{camp.subject}</option>)}
-                  </select>
-               </div>
+              {/* Notes Field */}
+              <div>
+                <label className={labelClass}>Production Notes</label>
+                <div className="relative">
+                  <AlignLeft className="absolute left-5 top-5 text-slate-300" size={18} />
+                  <textarea 
+                    name="notes" 
+                    value={formData.notes} 
+                    onChange={handleChange} 
+                    rows={4} 
+                    className={`${inputClass} pl-14 py-5 resize-none`} 
+                    placeholder="Provide additional context, specifications or requirements..."
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="flex gap-6 pt-12 border-t border-slate-50">
+          {/* Action Buttons */}
+          <div className="flex flex-col md:flex-row gap-6 pt-12 border-t border-slate-50">
             <button 
               type="submit" 
               className="flex-1 py-6 bg-blue-600 text-white rounded-[2.25rem] font-black text-sm uppercase tracking-[0.2em] shadow-2xl shadow-blue-200 transition-all hover:bg-blue-700 active:scale-[0.98] flex items-center justify-center gap-3"
