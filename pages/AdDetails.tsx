@@ -8,7 +8,7 @@ import {
   TrendingUp, Zap, BarChart3, 
   Info, Globe, Monitor, Activity, ShieldCheck,
   Eye, MousePointer2, UserCheck, Layers, BarChart,
-  Hash, RefreshCw
+  Hash, RefreshCw, Award, FileText, Briefcase
 } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 
@@ -107,7 +107,11 @@ export const AdDetails: React.FC = () => {
                     ad.status === 'Paused' ? 'bg-amber-500 text-white' : 'bg-slate-400 text-white'
                   }`}>{ad.status}</span>
                </div>
-               <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">{ad.platform} Hub • {ad.id}</p>
+               <div className="flex items-center gap-3">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">{ad.platform} Hub • {ad.id}</p>
+                  <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                  <span className={`text-[10px] font-black uppercase tracking-widest ${ad.boosting_by === 'Agency' ? 'text-red-500' : 'text-blue-500'}`}>{ad.boosting_by} Boosting</span>
+               </div>
             </div>
          </div>
          <div className="w-20 h-20 bg-blue-600 rounded-[2.5rem] flex items-center justify-center text-white shadow-2xl shadow-blue-100">
@@ -217,8 +221,20 @@ export const AdDetails: React.FC = () => {
              <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-8 flex items-center gap-2"><Layers size={12}/> Asset Configuration</h4>
              <div className="space-y-6">
                 <div className="flex justify-between pb-4 border-b border-slate-800">
+                   <div className="flex flex-col">
+                      <span className="text-xs font-bold text-slate-400">Target Brand</span>
+                   </div>
+                   <span className="text-sm font-black text-amber-400">{ad.brand || 'No Brand Linked'}</span>
+                </div>
+                {ad.boosting_by === 'Agency' && ad.work_order_no && (
+                   <div className="flex justify-between pb-4 border-b border-slate-800 animate-in slide-in-from-top-2">
+                      <span className="text-xs font-bold text-slate-400">Work Order No</span>
+                      <span className="text-sm font-black text-red-400">{ad.work_order_no}</span>
+                   </div>
+                )}
+                <div className="flex justify-between pb-4 border-b border-slate-800">
                    <span className="text-xs font-bold text-slate-400">Media Platform</span>
-                   <span className="text-sm font-black">{ad.platform}</span>
+                   <span className="text-sm font-black">{ad.platform} ({ad.boosting_by})</span>
                 </div>
                 <div className="flex justify-between pb-4 border-b border-slate-800">
                    <span className="text-xs font-bold text-slate-400">Main Objective</span>
@@ -233,7 +249,6 @@ export const AdDetails: React.FC = () => {
                    <span className="text-sm font-black text-emerald-400">${ad.total_budget.toLocaleString()}</span>
                 </div>
                 
-                {/* Visual Fix: Highlighting the Last Updated Info */}
                 <div className="flex items-start gap-4 pt-4 bg-slate-800/40 p-4 rounded-2xl border border-slate-800">
                    <div className="w-10 h-10 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center text-blue-400 shrink-0">
                       <RefreshCw size={18} />

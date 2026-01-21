@@ -34,6 +34,9 @@ export interface AdDailyMetric {
 export interface AdCampaignEntry {
   id: string;
   platform: 'Meta' | 'Google' | 'Others';
+  boosting_by: 'Own' | 'Agency';
+  brand?: string;
+  work_order_no?: string;
   subject: string;
   media_type: string;
   primary_kpi: string;

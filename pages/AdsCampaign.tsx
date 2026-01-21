@@ -10,7 +10,8 @@ import {
   ShieldAlert, Globe, PlayCircle, PauseCircle, Clock,
   BarChart3, LayoutList, Target, TrendingUp, AlertCircle,
   Info, RotateCcw, Filter, PlusCircle, Calculator,
-  Loader2, Check, RefreshCw, Layers, ClipboardPaste, Table as TableIcon
+  Loader2, Check, RefreshCw, Layers, ClipboardPaste, Table as TableIcon,
+  Briefcase, UserCircle, ShieldCheck, Award, FileText
 } from 'lucide-react';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 
@@ -34,6 +35,9 @@ export const AdsCampaign: React.FC = () => {
 
   const [formData, setFormData] = useState<Partial<AdCampaignEntry>>({
     platform: 'Meta',
+    boosting_by: 'Own',
+    brand: '',
+    work_order_no: '',
     subject: '',
     media_type: 'Image',
     primary_kpi: 'Traffic',
@@ -173,18 +177,15 @@ export const AdsCampaign: React.FC = () => {
     if (parsedBulkItems.length === 0) return;
 
     setFormData(prev => {
-      // FIX: Explicitly type existing metrics and Map to avoid 'unknown' type inference errors
       const existing: AdDailyMetric[] = prev.daily_metrics || [];
       const metricsMap = new Map<string, AdDailyMetric>(existing.map(m => [m.date, m]));
       
-      // Upsert: Overwrite if date exists
       parsedBulkItems.forEach(item => {
         metricsMap.set(item.date, item);
       });
 
       const updated = Array.from(metricsMap.values()).sort((a, b) => a.date.localeCompare(b.date));
       
-      // Recalculate totals
       const totalReach = updated.reduce((acc, m) => acc + m.reach, 0);
       const totalImp = updated.reduce((acc, m) => acc + m.impression, 0);
       const totalResult = updated.reduce((acc, m) => acc + m.result, 0);
@@ -213,6 +214,9 @@ export const AdsCampaign: React.FC = () => {
       setEditingCamp(null);
       setFormData({
         platform: 'Meta',
+        boosting_by: 'Own',
+        brand: '',
+        work_order_no: '',
         subject: '',
         media_type: 'Image',
         primary_kpi: 'Traffic',
@@ -302,6 +306,9 @@ export const AdsCampaign: React.FC = () => {
       const campToSave: AdCampaignEntry = {
         ...formData,
         platform: formData.platform || 'Meta',
+        boosting_by: formData.boosting_by || 'Own',
+        brand: formData.brand || '',
+        work_order_no: formData.boosting_by === 'Agency' ? formData.work_order_no : '',
         subject: formData.subject || '',
         media_type: formData.media_type || 'Image',
         primary_kpi: formData.primary_kpi || 'Traffic',
@@ -340,7 +347,8 @@ export const AdsCampaign: React.FC = () => {
     return campaigns.filter(c => {
       const matchSearch = searchTerm === '' || 
         c.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.platform?.toLowerCase().includes(searchTerm.toLowerCase());
+        c.platform?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.brand?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchMonth = !filterMonth || (c.start_date && c.start_date.startsWith(filterMonth));
       return matchSearch && matchMonth;
     });
@@ -418,7 +426,7 @@ export const AdsCampaign: React.FC = () => {
         <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex flex-wrap items-center gap-6">
            <div className="relative group flex-1 max-w-md">
               <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-blue-500 transition-colors" />
-              <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search Campaign Subject..." className="w-full pl-12 pr-6 py-4 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/5 text-sm font-bold shadow-sm" />
+              <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search Campaign Subject or Brand..." className="w-full pl-12 pr-6 py-4 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/5 text-sm font-bold shadow-sm" />
            </div>
 
            <div className="flex items-center gap-4">
@@ -467,11 +475,25 @@ export const AdsCampaign: React.FC = () => {
               {filteredCampaigns.map((camp) => (
                 <tr key={camp.id} className="group hover:bg-slate-50/80 transition-all duration-300">
                   <td className="px-8 py-8">
-                    <span className="text-[11px] font-black text-slate-900">{camp.platform}</span>
-                    <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">{camp.media_type}</p>
+                    <div className="flex flex-col">
+                       <span className="text-[11px] font-black text-slate-900">{camp.platform}</span>
+                       <div className="flex items-center gap-1.5 mt-1">
+                          <span className={`text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest ${camp.boosting_by === 'Agency' ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-blue-50 text-blue-500 border border-blue-100'}`}>
+                             {camp.boosting_by}
+                          </span>
+                          {camp.brand && (
+                            <span className="text-[7px] font-black px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded uppercase tracking-widest border border-slate-200">
+                               {camp.brand}
+                            </span>
+                          )}
+                       </div>
+                    </div>
                   </td>
                   <td className="px-8 py-8 max-w-xs">
-                    <p className="text-[11px] font-bold text-slate-700 leading-tight line-clamp-2">{camp.subject}</p>
+                    <p className="text-[11px] font-bold text-slate-700 leading-tight line-clamp-1">{camp.subject}</p>
+                    {camp.work_order_no && (
+                      <p className="text-[8px] font-bold text-blue-400 uppercase mt-1 truncate">WO: {camp.work_order_no}</p>
+                    )}
                   </td>
                   <td className="px-8 py-8">
                     <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-[9px] font-black uppercase border border-slate-200">{camp.primary_kpi}</span>
@@ -540,7 +562,11 @@ export const AdsCampaign: React.FC = () => {
                   <div className="w-14 h-14 bg-blue-600 rounded-3xl flex items-center justify-center text-white shadow-2xl shadow-blue-100"><Megaphone size={28}/></div>
                   <div>
                     <h3 className="text-2xl font-black text-slate-900 tracking-tight">{editingCamp ? 'Transition Lifecycle' : 'Initial Planning'}</h3>
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Status: {formData.status}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Status: {formData.status}</p>
+                       <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                       <p className={`text-[9px] font-black uppercase tracking-widest ${formData.boosting_by === 'Agency' ? 'text-red-500' : 'text-blue-500'}`}>{formData.boosting_by} Boosting</p>
+                    </div>
                   </div>
                </div>
                <button onClick={() => !isSaving && setIsModalOpen(false)} className="w-12 h-12 flex items-center justify-center bg-white border border-slate-100 rounded-full text-slate-300 hover:text-slate-900 transition-all"><X size={24}/></button>
@@ -568,8 +594,51 @@ export const AdsCampaign: React.FC = () => {
                  </div>
                  <div className="md:col-span-2">
                     <label className={labelClass}>Campaign Subject</label>
-                    <input required value={formData.subject} onChange={e => setFormData(p => ({ ...p, subject: e.target.value }))} className={inputClass} placeholder="e.g. SONOS Roam 2 Launch Phase 1" />
+                    <input required value={formData.subject} onChange={e => setFormData(p => ({ ...p, subject: e.target.value }))} className={inputClass} placeholder="e.g. Viewsonic VA221A-H-Jan-2026" />
                  </div>
+                 
+                 {/* New Boosting Profile Selector */}
+                 <div>
+                    <label className={labelClass}>Boosting Profile</label>
+                    <div className="grid grid-cols-2 gap-2 bg-slate-50 p-1 rounded-2xl border border-slate-100">
+                       <button 
+                         type="button" 
+                         onClick={() => setFormData(p => ({ ...p, boosting_by: 'Own' }))}
+                         className={`py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${formData.boosting_by === 'Own' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                       >
+                         Own
+                       </button>
+                       <button 
+                         type="button" 
+                         onClick={() => setFormData(p => ({ ...p, boosting_by: 'Agency' }))}
+                         className={`py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${formData.boosting_by === 'Agency' ? 'bg-white text-red-500 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                       >
+                         Agency
+                       </button>
+                    </div>
+                 </div>
+
+                 {/* Brand Selection - Always show */}
+                 <div>
+                    <label className={labelClass}>Target Brand</label>
+                    <div className="relative">
+                       <Award size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
+                       <input value={formData.brand} onChange={e => setFormData(p => ({ ...p, brand: e.target.value }))} className={`${inputClass} pl-12`} placeholder="e.g. Viewsonic" />
+                    </div>
+                 </div>
+
+                 {/* Work Order No - Show only for Agency */}
+                 {formData.boosting_by === 'Agency' && (
+                    <div className="animate-in slide-in-from-right-4">
+                      <label className={labelClass}>Work Order No</label>
+                      <div className="relative">
+                         <FileText size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
+                         <input value={formData.work_order_no} onChange={e => setFormData(p => ({ ...p, work_order_no: e.target.value }))} className={`${inputClass} pl-12 border-red-100 focus:border-red-500 focus:ring-red-500/5`} placeholder="e.g. PROF-211..." />
+                      </div>
+                    </div>
+                 )}
+
+                 {/* Content hub and specs - rearranged for better flow */}
                  <div>
                     <label className={labelClass}>Platform Hub</label>
                     <select value={formData.platform} onChange={e => setFormData(p => ({ ...p, platform: e.target.value as any }))} className={inputClass}>
