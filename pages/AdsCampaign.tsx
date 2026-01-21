@@ -10,7 +10,7 @@ import {
   ShieldAlert, Globe, PlayCircle, PauseCircle, Clock,
   BarChart3, LayoutList, Target, TrendingUp, AlertCircle,
   Info, RotateCcw, Filter, PlusCircle, Calculator,
-  Loader2, Check, RefreshCw
+  Loader2, Check, RefreshCw, Layers, ClipboardPaste, Table as TableIcon
 } from 'lucide-react';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 
@@ -20,6 +20,8 @@ export const AdsCampaign: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkRawData, setBulkRawData] = useState('');
   const [editingCamp, setEditingCamp] = useState<AdCampaignEntry | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -105,6 +107,103 @@ export const AdsCampaign: React.FC = () => {
     }
   };
 
+  // Parsing Logic for Bulk Data
+  const parsedBulkItems = useMemo(() => {
+    if (!bulkRawData.trim()) return [];
+    
+    const lines = bulkRawData.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const records: AdDailyMetric[] = [];
+    let currentRecord: Partial<AdDailyMetric> | null = null;
+    let numbersInBlock: number[] = [];
+    let moneyInBlock: number | null = null;
+
+    const finalizeRecord = () => {
+      if (currentRecord && currentRecord.date) {
+        records.push({
+          date: currentRecord.date,
+          result: numbersInBlock[0] || 0,
+          reach: numbersInBlock[1] || 0,
+          impression: numbersInBlock[2] || 0,
+          spend: moneyInBlock || 0
+        });
+      }
+    };
+
+    lines.forEach(line => {
+      // Date Check (YYYY-MM-DD)
+      const dateMatch = line.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (dateMatch) {
+        finalizeRecord();
+        currentRecord = { date: dateMatch[1] };
+        numbersInBlock = [];
+        moneyInBlock = null;
+        return;
+      }
+
+      if (!currentRecord) return;
+
+      // Filter out bracketed lines like [2]
+      if (line.match(/^\[.*\]$/)) return;
+
+      // Extract Money ($)
+      const moneyMatch = line.match(/\$(\d+[\d,.]*)/);
+      if (moneyMatch && moneyInBlock === null) {
+        moneyInBlock = parseFloat(moneyMatch[1].replace(/,/g, ''));
+        return;
+      }
+
+      // Extract Leading Numbers (handling commas and dashes)
+      // We normalize dashes to 0
+      let cleanedLine = line.replace(/^[—–-]$/, '0');
+      const numberMatch = cleanedLine.match(/^([\d,.-]+)/);
+      if (numberMatch) {
+        const valStr = numberMatch[1].replace(/,/g, '');
+        const val = valStr === '-' || valStr === '—' || valStr === '–' ? 0 : parseFloat(valStr);
+        if (!isNaN(val)) {
+          numbersInBlock.push(val);
+        }
+      }
+    });
+
+    finalizeRecord();
+    return records;
+  }, [bulkRawData]);
+
+  const commitBulkData = () => {
+    if (parsedBulkItems.length === 0) return;
+
+    setFormData(prev => {
+      // FIX: Explicitly type existing metrics and Map to avoid 'unknown' type inference errors
+      const existing: AdDailyMetric[] = prev.daily_metrics || [];
+      const metricsMap = new Map<string, AdDailyMetric>(existing.map(m => [m.date, m]));
+      
+      // Upsert: Overwrite if date exists
+      parsedBulkItems.forEach(item => {
+        metricsMap.set(item.date, item);
+      });
+
+      const updated = Array.from(metricsMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+      
+      // Recalculate totals
+      const totalReach = updated.reduce((acc, m) => acc + m.reach, 0);
+      const totalImp = updated.reduce((acc, m) => acc + m.impression, 0);
+      const totalResult = updated.reduce((acc, m) => acc + m.result, 0);
+      const totalSpend = updated.reduce((acc, m) => acc + m.spend, 0);
+      
+      return { 
+        ...prev, 
+        daily_metrics: updated,
+        reach: totalReach,
+        impression: totalImp,
+        result: totalResult.toString(),
+        spend: totalSpend
+      };
+    });
+
+    setBulkRawData('');
+    setIsBulkModalOpen(false);
+  };
+
   const handleOpenModal = (camp: AdCampaignEntry | null = null) => {
     if (isViewer) return;
     if (camp) {
@@ -131,24 +230,6 @@ export const AdsCampaign: React.FC = () => {
       });
     }
     setIsModalOpen(true);
-  };
-
-  // Smart Paste Handler
-  const handleSmartPaste = (e: React.ClipboardEvent) => {
-    const pastedText = e.clipboardData.getData('text');
-    const parts = pastedText.split(/\r?\n|\t/).map(p => p.trim()).filter(p => p.length > 0);
-    if (parts.length >= 2) {
-      e.preventDefault();
-      const cleanValue = (val: string) => val.replace(/[^\d.-]/g, '');
-      const results = cleanValue(parts[0]);
-      const reach = cleanValue(parts[1]);
-      const impressions = parts.length > 2 ? cleanValue(parts[2]) : '';
-      const spend = parts.length > 3 ? cleanValue(parts[3]) : '';
-      setMetricResult(results);
-      setMetricReach(reach);
-      if (impressions) setMetricImpression(impressions);
-      if (spend) setMetricSpend(spend);
-    }
   };
 
   const addDailyMetric = () => {
@@ -562,26 +643,33 @@ export const AdsCampaign: React.FC = () => {
                       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                          <div>
                             <label className={labelClass}>Select Date</label>
-                            <input type="date" value={metricDate} onChange={e => setMetricDate(e.target.value)} onPaste={handleSmartPaste} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" />
+                            <input type="date" value={metricDate} onChange={e => setMetricDate(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" />
                          </div>
                          <div>
                             <label className={labelClass}>Results</label>
-                            <input type="text" value={metricResult} onChange={e => setMetricResult(e.target.value)} onPaste={handleSmartPaste} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" placeholder="QTY" />
+                            <input type="text" value={metricResult} onChange={e => setMetricResult(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" placeholder="QTY" />
                          </div>
                          <div>
                             <label className={labelClass}>Reach</label>
-                            <input type="text" value={metricReach} onChange={e => setMetricReach(e.target.value)} onPaste={handleSmartPaste} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" placeholder="Unique" />
+                            <input type="text" value={metricReach} onChange={e => setMetricReach(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" placeholder="Unique" />
                          </div>
                          <div>
                             <label className={labelClass}>Impressions</label>
-                            <input type="text" value={metricImpression} onChange={e => setMetricImpression(e.target.value)} onPaste={handleSmartPaste} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" placeholder="Views" />
+                            <input type="text" value={metricImpression} onChange={e => setMetricImpression(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" placeholder="Views" />
                          </div>
                          <div>
                             <label className={labelClass}>Spend ($)</label>
-                            <input type="text" value={metricSpend} onChange={e => setMetricSpend(e.target.value)} onPaste={handleSmartPaste} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" placeholder="Cost" />
+                            <input type="text" value={metricSpend} onChange={e => setMetricSpend(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold shadow-sm" placeholder="Cost" />
                          </div>
                       </div>
-                      <div className="flex justify-end pt-2">
+                      <div className="flex justify-end pt-2 gap-3">
+                        <button 
+                           type="button" 
+                           onClick={() => setIsBulkModalOpen(true)}
+                           className="px-6 py-3.5 bg-white border border-slate-200 text-blue-600 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-sm flex items-center justify-center gap-2 hover:bg-slate-50 active:scale-95 transition-all"
+                         >
+                           <ClipboardPaste size={14} /> BULK Entry
+                         </button>
                         <button type="button" onClick={addDailyMetric} className="px-10 py-3.5 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-100 flex items-center justify-center gap-2 hover:bg-blue-700 active:scale-95 transition-all">
                            <PlusCircle size={14} /> Commit Entry
                          </button>
@@ -647,6 +735,94 @@ export const AdsCampaign: React.FC = () => {
                 <button type="button" disabled={isSaving} onClick={() => setIsModalOpen(false)} className="px-12 py-5 bg-slate-50 text-slate-400 rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-colors disabled:opacity-50">Abort</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Entry Modal */}
+      {isBulkModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
+          <div className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in-95">
+             <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
+                <div className="flex items-center gap-4">
+                   <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg"><ClipboardPaste size={24}/></div>
+                   <div>
+                      <h3 className="text-xl font-black text-slate-900 tracking-tight">Bulk Performance Ingestion</h3>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Parse multiple daily metrics at once</p>
+                   </div>
+                </div>
+                <button onClick={() => setIsBulkModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-100 rounded-full text-slate-300 hover:text-slate-900 transition-all"><X size={20}/></button>
+             </div>
+             
+             <div className="p-8 grid grid-cols-1 lg:grid-cols-2 gap-8 max-h-[70vh] overflow-y-auto">
+                <div className="space-y-4">
+                   <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Raw Input Data</label>
+                      <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black uppercase">
+                        <Check size={10} /> Auto-Overwrite ON
+                      </div>
+                   </div>
+                   <textarea 
+                     value={bulkRawData}
+                     onChange={(e) => setBulkRawData(e.target.value)}
+                     className="w-full h-[400px] p-6 bg-slate-50 border border-slate-100 rounded-3xl font-mono text-[11px] leading-relaxed text-slate-600 outline-none focus:ring-4 focus:ring-blue-500/5 transition-all resize-none"
+                     placeholder="Paste raw content here...&#10;2026-01-21&#10;98&#10;[2]&#10;Follows or likes&#10;10,685&#10;11,701&#10;$2.83"
+                   />
+                </div>
+
+                <div className="space-y-4 flex flex-col">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                     <TableIcon size={12} className="text-blue-500"/> Ingestion Preview
+                   </label>
+                   <div className="flex-1 bg-slate-50 rounded-3xl border border-slate-100 overflow-hidden flex flex-col">
+                      <div className="overflow-x-auto">
+                         <table className="w-full text-left">
+                            <thead className="bg-slate-900 sticky top-0">
+                               <tr>
+                                  <th className="px-4 py-3 text-[8px] font-black text-white uppercase">Date</th>
+                                  <th className="px-4 py-3 text-[8px] font-black text-white uppercase text-center">Res</th>
+                                  <th className="px-4 py-3 text-[8px] font-black text-white uppercase text-center">Reach</th>
+                                  <th className="px-4 py-3 text-[8px] font-black text-white uppercase text-center">Impr</th>
+                                  <th className="px-4 py-3 text-[8px] font-black text-white uppercase text-center">Spend</th>
+                               </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                               {parsedBulkItems.map((item, idx) => (
+                                 <tr key={idx} className="bg-white">
+                                    <td className="px-4 py-2.5 text-[10px] font-bold text-slate-900">{item.date}</td>
+                                    <td className="px-4 py-2.5 text-[10px] font-black text-purple-600 text-center">{item.result.toLocaleString()}</td>
+                                    <td className="px-4 py-2.5 text-[10px] font-black text-emerald-600 text-center">{item.reach.toLocaleString()}</td>
+                                    <td className="px-4 py-2.5 text-[10px] font-black text-blue-600 text-center">{item.impression.toLocaleString()}</td>
+                                    <td className="px-4 py-2.5 text-[10px] font-black text-slate-900 text-center">${item.spend.toLocaleString()}</td>
+                                 </tr>
+                               ))}
+                               {parsedBulkItems.length === 0 && (
+                                 <tr>
+                                    <td colSpan={5} className="px-8 py-20 text-center">
+                                       <div className="flex flex-col items-center gap-3 opacity-20">
+                                          <LayoutList size={32} />
+                                          <p className="text-[9px] font-black uppercase tracking-widest">Awaiting Valid Input</p>
+                                       </div>
+                                    </td>
+                                 </tr>
+                               )}
+                            </tbody>
+                         </table>
+                      </div>
+                   </div>
+                </div>
+             </div>
+
+             <div className="p-8 bg-slate-50/50 border-t border-slate-50 flex gap-4">
+                <button 
+                  onClick={commitBulkData}
+                  disabled={parsedBulkItems.length === 0}
+                  className="flex-1 py-5 bg-blue-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl shadow-blue-100 flex items-center justify-center gap-3 active:scale-[0.98] transition-all hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Save size={18}/> Commit {parsedBulkItems.length} Records
+                </button>
+                <button onClick={() => setIsBulkModalOpen(false)} className="px-10 py-5 bg-white border border-slate-200 text-slate-400 rounded-[2rem] font-black text-xs uppercase tracking-widest hover:text-slate-900">Cancel</button>
+             </div>
           </div>
         </div>
       )}
