@@ -34,7 +34,7 @@ export interface AdDailyMetric {
 export interface AdCampaignEntry {
   id: string;
   platform: 'Meta' | 'Google' | 'Others';
-  boosting_by: 'Own' | 'Agency';
+  boosting_by: 'Own' | 'Agency' | 'Collab';
   brand?: string;
   work_order_no?: string;
   subject: string;

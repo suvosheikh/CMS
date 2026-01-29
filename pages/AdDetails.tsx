@@ -53,7 +53,7 @@ export const AdDetails: React.FC = () => {
         name: m.date,
         reach: m.reach,
         impression: m.impression,
-        result: m.result,
+        result: parseInt(m.result.toString()),
         spend: m.spend
       }));
   }, [ad]);
@@ -62,7 +62,6 @@ export const AdDetails: React.FC = () => {
     if (!iso) return 'Pending First Sync';
     try {
       const d = new Date(iso);
-      // Format: 20 Jan 25 at 6:25 PM
       const datePart = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
       const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
       return `${datePart} at ${timePart}`;
@@ -119,7 +118,6 @@ export const AdDetails: React.FC = () => {
          </div>
       </header>
 
-      {/* Campaign Summary Matrix Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
         <div className="p-7 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm group hover:border-purple-200 transition-all">
            <div className="flex items-center gap-3 mb-4">
@@ -162,26 +160,34 @@ export const AdDetails: React.FC = () => {
               <div className="p-2 bg-amber-50 text-amber-600 rounded-xl group-hover:bg-amber-600 group-hover:text-white transition-all"><Zap size={14} /></div>
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Cost per Result</p>
            </div>
-           <p className="text-3xl font-black text-slate-900 tracking-tight">${costPerResult.toFixed(2)}</p>
+           <p className="text-3xl font-black text-slate-900 tracking-tight">${costPerResult.toFixed(4)}</p>
            <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase">Performance Rate</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
         <div className="lg:col-span-8 bg-white p-10 rounded-[4rem] border border-slate-100 shadow-sm">
-          <div className="flex items-center justify-between mb-10">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-10">
              <div className="flex items-center gap-3">
                 <BarChart3 className="text-blue-600" size={20}/>
                 <h3 className="text-xl font-black text-[#0f172a] tracking-tight">Performance Flow Matrix</h3>
              </div>
-             <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2">
+             <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-1.5">
                    <div className="w-2.5 h-2.5 rounded-full bg-blue-600"></div>
-                   <span className="text-[10px] font-black text-slate-400 uppercase">Impressions</span>
+                   <span className="text-[9px] font-black text-slate-400 uppercase">Impr.</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-                   <span className="text-[10px] font-black text-slate-400 uppercase">Reach</span>
+                   <span className="text-[9px] font-black text-slate-400 uppercase">Reach</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                   <div className="w-2.5 h-2.5 rounded-full bg-purple-500"></div>
+                   <span className="text-[9px] font-black text-slate-400 uppercase">Results</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                   <div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div>
+                   <span className="text-[9px] font-black text-slate-400 uppercase">Spend</span>
                 </div>
              </div>
           </div>
@@ -201,10 +207,12 @@ export const AdDetails: React.FC = () => {
                   <Tooltip 
                     contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'}}
                     labelStyle={{fontWeight: 'black', marginBottom: '8px', textTransform: 'uppercase', fontSize: '10px'}}
-                    itemStyle={{fontWeight: '900', fontSize: '12px'}}
+                    itemStyle={{fontWeight: '900', fontSize: '11px'}}
                   />
-                  <Area type="monotone" dataKey="reach" stroke="#10b981" strokeWidth={5} fill="#10b98110" name="Reach" />
-                  <Area type="monotone" dataKey="impression" stroke="#3b82f6" strokeWidth={5} fill="#3b82f610" name="Impression" />
+                  <Area type="monotone" dataKey="impression" stroke="#3b82f6" strokeWidth={4} fill="#3b82f608" name="Impressions" />
+                  <Area type="monotone" dataKey="reach" stroke="#10b981" strokeWidth={4} fill="#10b98108" name="Reach" />
+                  <Area type="monotone" dataKey="result" stroke="#a855f7" strokeWidth={4} fill="#a855f708" name="Results" />
+                  <Area type="monotone" dataKey="spend" stroke="#f59e0b" strokeWidth={4} fill="#f59e0b08" name="Spend ($)" />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (

@@ -11,7 +11,7 @@ import {
   BarChart3, LayoutList, Target, TrendingUp, AlertCircle,
   Info, RotateCcw, Filter, PlusCircle, Calculator,
   Loader2, Check, RefreshCw, Layers, ClipboardPaste, Table as TableIcon,
-  Briefcase, UserCircle, ShieldCheck, Award, FileText
+  Briefcase, UserCircle, ShieldCheck, Award, FileText, Handshake
 } from 'lucide-react';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 
@@ -134,7 +134,6 @@ export const AdsCampaign: React.FC = () => {
     };
 
     lines.forEach(line => {
-      // Date Check (YYYY-MM-DD)
       const dateMatch = line.match(/^(\d{4}-\d{2}-\d{2})/);
       if (dateMatch) {
         finalizeRecord();
@@ -145,19 +144,12 @@ export const AdsCampaign: React.FC = () => {
       }
 
       if (!currentRecord) return;
-
-      // Filter out bracketed lines like [2]
       if (line.match(/^\[.*\]$/)) return;
-
-      // Extract Money ($)
       const moneyMatch = line.match(/\$(\d+[\d,.]*)/);
       if (moneyMatch && moneyInBlock === null) {
         moneyInBlock = parseFloat(moneyMatch[1].replace(/,/g, ''));
         return;
       }
-
-      // Extract Leading Numbers (handling commas and dashes)
-      // We normalize dashes to 0
       let cleanedLine = line.replace(/^[—–-]$/, '0');
       const numberMatch = cleanedLine.match(/^([\d,.-]+)/);
       if (numberMatch) {
@@ -175,22 +167,15 @@ export const AdsCampaign: React.FC = () => {
 
   const commitBulkData = () => {
     if (parsedBulkItems.length === 0) return;
-
     setFormData(prev => {
       const existing: AdDailyMetric[] = prev.daily_metrics || [];
       const metricsMap = new Map<string, AdDailyMetric>(existing.map(m => [m.date, m]));
-      
-      parsedBulkItems.forEach(item => {
-        metricsMap.set(item.date, item);
-      });
-
+      parsedBulkItems.forEach(item => { metricsMap.set(item.date, item); });
       const updated = Array.from(metricsMap.values()).sort((a, b) => a.date.localeCompare(b.date));
-      
       const totalReach = updated.reduce((acc, m) => acc + m.reach, 0);
       const totalImp = updated.reduce((acc, m) => acc + m.impression, 0);
       const totalResult = updated.reduce((acc, m) => acc + m.result, 0);
       const totalSpend = updated.reduce((acc, m) => acc + m.spend, 0);
-      
       return { 
         ...prev, 
         daily_metrics: updated,
@@ -200,7 +185,6 @@ export const AdsCampaign: React.FC = () => {
         spend: totalSpend
       };
     });
-
     setBulkRawData('');
     setIsBulkModalOpen(false);
   };
@@ -262,11 +246,7 @@ export const AdsCampaign: React.FC = () => {
         spend: totalSpend
       };
     });
-    setMetricReach('');
-    setMetricImpression('');
-    setMetricResult('');
-    setMetricSpend('');
-    setMetricDate(today);
+    setMetricReach(''); setMetricImpression(''); setMetricResult(''); setMetricSpend(''); setMetricDate(today);
   };
 
   const editDailyMetric = (metric: AdDailyMetric) => {
@@ -301,29 +281,32 @@ export const AdsCampaign: React.FC = () => {
     setIsSaving(true);
     try {
       const currentDuration = getDuration(formData);
-      const results = parseInt(formData.result || '0');
-      const cpr = results > 0 ? (Number(formData.spend) / results) : 0;
+      const finalSpend = Number(formData.spend) || 0;
+      const finalResult = parseInt(formData.result || '0') || 0;
+      const cpr = finalResult > 0 ? (finalSpend / finalResult) : 0;
+      
       const campToSave: AdCampaignEntry = {
         ...formData,
         platform: formData.platform || 'Meta',
         boosting_by: formData.boosting_by || 'Own',
         brand: formData.brand || '',
-        work_order_no: formData.boosting_by === 'Agency' ? formData.work_order_no : '',
+        work_order_no: (formData.boosting_by === 'Agency' || formData.boosting_by === 'Collab') ? formData.work_order_no : '',
         subject: formData.subject || '',
         media_type: formData.media_type || 'Image',
         primary_kpi: formData.primary_kpi || 'Traffic',
         planned_duration: currentDuration,
-        cost_per_result: Number(cpr.toFixed(2)),
+        cost_per_result: Number(cpr.toFixed(4)),
         total_budget: Number(formData.total_budget) || 0,
-        spend: Number(formData.spend) || 0,
+        spend: finalSpend,
         reach: Number(formData.reach) || 0,
         impression: Number(formData.impression) || 0,
-        result: formData.result || '0',
+        result: finalResult.toString(),
         status: formData.status as AdStatus,
         id: editingCamp ? editingCamp.id : `C-${Math.floor(1000 + Math.random() * 9000)}`,
         daily_metrics: formData.daily_metrics || [],
         last_updated_at: new Date().toISOString()
       } as AdCampaignEntry;
+      
       await DBService.saveAdsCampaign(campToSave);
       await new Promise(r => setTimeout(r, 500));
       setIsModalOpen(false);
@@ -478,7 +461,11 @@ export const AdsCampaign: React.FC = () => {
                     <div className="flex flex-col">
                        <span className="text-[11px] font-black text-slate-900">{camp.platform}</span>
                        <div className="flex items-center gap-1.5 mt-1">
-                          <span className={`text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest ${camp.boosting_by === 'Agency' ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-blue-50 text-blue-500 border border-blue-100'}`}>
+                          <span className={`text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest ${
+                            camp.boosting_by === 'Agency' ? 'bg-red-50 text-red-500 border border-red-100' : 
+                            camp.boosting_by === 'Collab' ? 'bg-purple-50 text-purple-500 border border-purple-100' :
+                            'bg-blue-50 text-blue-500 border border-blue-100'
+                          }`}>
                              {camp.boosting_by}
                           </span>
                           {camp.brand && (
@@ -492,7 +479,9 @@ export const AdsCampaign: React.FC = () => {
                   <td className="px-8 py-8 max-w-xs">
                     <p className="text-[11px] font-bold text-slate-700 leading-tight line-clamp-1">{camp.subject}</p>
                     {camp.work_order_no && (
-                      <p className="text-[8px] font-bold text-blue-400 uppercase mt-1 truncate">WO: {camp.work_order_no}</p>
+                      <p className="text-[8px] font-bold text-blue-400 uppercase mt-1 truncate">
+                        {camp.boosting_by === 'Collab' ? 'REF: ' : 'WO: '}{camp.work_order_no}
+                      </p>
                     )}
                   </td>
                   <td className="px-8 py-8">
@@ -565,7 +554,11 @@ export const AdsCampaign: React.FC = () => {
                     <div className="flex items-center gap-2 mt-1">
                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Status: {formData.status}</p>
                        <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                       <p className={`text-[9px] font-black uppercase tracking-widest ${formData.boosting_by === 'Agency' ? 'text-red-500' : 'text-blue-500'}`}>{formData.boosting_by} Boosting</p>
+                       <p className={`text-[9px] font-black uppercase tracking-widest ${
+                         formData.boosting_by === 'Agency' ? 'text-red-500' : 
+                         formData.boosting_by === 'Collab' ? 'text-purple-500' : 
+                         'text-blue-500'
+                       }`}>{formData.boosting_by} Boosting</p>
                     </div>
                   </div>
                </div>
@@ -597,10 +590,9 @@ export const AdsCampaign: React.FC = () => {
                     <input required value={formData.subject} onChange={e => setFormData(p => ({ ...p, subject: e.target.value }))} className={inputClass} placeholder="e.g. Viewsonic VA221A-H-Jan-2026" />
                  </div>
                  
-                 {/* New Boosting Profile Selector */}
                  <div>
                     <label className={labelClass}>Boosting Profile</label>
-                    <div className="grid grid-cols-2 gap-2 bg-slate-50 p-1 rounded-2xl border border-slate-100">
+                    <div className="grid grid-cols-3 gap-2 bg-slate-50 p-1 rounded-2xl border border-slate-100">
                        <button 
                          type="button" 
                          onClick={() => setFormData(p => ({ ...p, boosting_by: 'Own' }))}
@@ -615,10 +607,16 @@ export const AdsCampaign: React.FC = () => {
                        >
                          Agency
                        </button>
+                       <button 
+                         type="button" 
+                         onClick={() => setFormData(p => ({ ...p, boosting_by: 'Collab' }))}
+                         className={`py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${formData.boosting_by === 'Collab' ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                       >
+                         Collab
+                       </button>
                     </div>
                  </div>
 
-                 {/* Brand Selection - Always show */}
                  <div>
                     <label className={labelClass}>Target Brand</label>
                     <div className="relative">
@@ -627,18 +625,21 @@ export const AdsCampaign: React.FC = () => {
                     </div>
                  </div>
 
-                 {/* Work Order No - Show only for Agency */}
-                 {formData.boosting_by === 'Agency' && (
+                 {(formData.boosting_by === 'Agency' || formData.boosting_by === 'Collab') && (
                     <div className="animate-in slide-in-from-right-4">
-                      <label className={labelClass}>Work Order No</label>
+                      <label className={labelClass}>{formData.boosting_by === 'Agency' ? 'Work Order No' : 'Collab Reference'}</label>
                       <div className="relative">
                          <FileText size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                         <input value={formData.work_order_no} onChange={e => setFormData(p => ({ ...p, work_order_no: e.target.value }))} className={`${inputClass} pl-12 border-red-100 focus:border-red-500 focus:ring-red-500/5`} placeholder="e.g. PROF-211..." />
+                         <input 
+                          value={formData.work_order_no} 
+                          onChange={e => setFormData(p => ({ ...p, work_order_no: e.target.value }))} 
+                          className={`${inputClass} pl-12 ${formData.boosting_by === 'Agency' ? 'border-red-100 focus:border-red-500 focus:ring-red-500/5' : 'border-purple-100 focus:border-purple-500 focus:ring-purple-500/5'}`} 
+                          placeholder={formData.boosting_by === 'Agency' ? "e.g. PROF-211..." : "e.g. Brand Ref ID"} 
+                        />
                       </div>
                     </div>
                  )}
 
-                 {/* Content hub and specs - rearranged for better flow */}
                  <div>
                     <label className={labelClass}>Platform Hub</label>
                     <select value={formData.platform} onChange={e => setFormData(p => ({ ...p, platform: e.target.value as any }))} className={inputClass}>
@@ -807,8 +808,8 @@ export const AdsCampaign: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Bulk Entry Modal */}
+      
+      {/* (Keep BulkModal and ConfirmationModal sections same as original) */}
       {isBulkModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
           <div className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in-95">
