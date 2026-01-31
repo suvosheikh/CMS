@@ -28,6 +28,7 @@ export const AdsCampaign: React.FC = () => {
   
   const currentYear = new Date().getFullYear().toString();
   const [filterMonth, setFilterMonth] = useState(currentYear);
+  const [filterBoosting, setFilterBoosting] = useState<string>(''); // New Filter State
   
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -333,9 +334,10 @@ export const AdsCampaign: React.FC = () => {
         c.platform?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.brand?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchMonth = !filterMonth || (c.start_date && c.start_date.startsWith(filterMonth));
-      return matchSearch && matchMonth;
+      const matchBoosting = !filterBoosting || c.boosting_by === filterBoosting;
+      return matchSearch && matchMonth && matchBoosting;
     });
-  }, [campaigns, searchTerm, filterMonth]);
+  }, [campaigns, searchTerm, filterMonth, filterBoosting]);
 
   const stats = useMemo(() => {
     const totalSpend = filteredCampaigns.reduce((acc, c) => acc + (Number(c.spend) || 0), 0);
@@ -413,6 +415,26 @@ export const AdsCampaign: React.FC = () => {
            </div>
 
            <div className="flex items-center gap-4">
+              {/* Boosting Profile Filter Dropdown */}
+              <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-5 py-3 shadow-sm transition-all hover:border-blue-200">
+                <div className="flex items-center gap-2 pr-3 border-r border-slate-100">
+                   <Handshake size={14} className="text-blue-500" />
+                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                     Profile
+                   </span>
+                </div>
+                <select 
+                  value={filterBoosting} 
+                  onChange={(e) => setFilterBoosting(e.target.value)}
+                  className="text-sm font-bold text-slate-700 outline-none bg-transparent cursor-pointer min-w-[100px]"
+                >
+                  <option value="">All Profiles</option>
+                  <option value="Own">Own</option>
+                  <option value="Agency">Agency</option>
+                  <option value="Collab">Collab</option>
+                </select>
+              </div>
+
               <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-5 py-3 shadow-sm transition-all hover:border-blue-200">
                 <div className="flex items-center gap-2 pr-3 border-r border-slate-100">
                    <Filter size={14} className="text-blue-500" />
@@ -427,12 +449,12 @@ export const AdsCampaign: React.FC = () => {
                   onChange={(e) => setFilterMonth(e.target.value)}
                   className="text-sm font-bold text-slate-700 outline-none bg-transparent cursor-pointer"
                 />
-                {!isFullYearView && (
+                {( !isFullYearView || filterBoosting !== '' ) && (
                   <button 
-                    onClick={() => setFilterMonth(currentYear)} 
+                    onClick={() => { setFilterMonth(currentYear); setFilterBoosting(''); }} 
                     className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-100 transition-all ml-2"
                   >
-                    <RotateCcw size={12} /> This Year
+                    <RotateCcw size={12} /> Reset
                   </button>
                 )}
               </div>
@@ -533,7 +555,7 @@ export const AdsCampaign: React.FC = () => {
                    <td colSpan={9} className="px-8 py-24 text-center">
                       <div className="flex flex-col items-center gap-4 opacity-20">
                          <LayoutList size={48} />
-                         <p className="text-xs font-black uppercase tracking-[0.3em]">No records found for {isFullYearView ? `Year ${filterMonth}` : `Month ${filterMonth}`}</p>
+                         <p className="text-xs font-black uppercase tracking-[0.3em]">No records found for active filters</p>
                       </div>
                    </td>
                 </tr>
@@ -808,8 +830,7 @@ export const AdsCampaign: React.FC = () => {
           </div>
         </div>
       )}
-      
-      {/* (Keep BulkModal and ConfirmationModal sections same as original) */}
+
       {isBulkModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
           <div className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in-95">
