@@ -28,7 +28,8 @@ export const AdsCampaign: React.FC = () => {
   
   const currentYear = new Date().getFullYear().toString();
   const [filterMonth, setFilterMonth] = useState(currentYear);
-  const [filterBoosting, setFilterBoosting] = useState<string>(''); // New Filter State
+  const [filterBoosting, setFilterBoosting] = useState<string>(''); 
+  const [filterStatus, setFilterStatus] = useState<string>(''); // New Status Filter State
   
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -335,9 +336,10 @@ export const AdsCampaign: React.FC = () => {
         c.brand?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchMonth = !filterMonth || (c.start_date && c.start_date.startsWith(filterMonth));
       const matchBoosting = !filterBoosting || c.boosting_by === filterBoosting;
-      return matchSearch && matchMonth && matchBoosting;
+      const matchStatus = !filterStatus || c.status === filterStatus;
+      return matchSearch && matchMonth && matchBoosting && matchStatus;
     });
-  }, [campaigns, searchTerm, filterMonth, filterBoosting]);
+  }, [campaigns, searchTerm, filterMonth, filterBoosting, filterStatus]);
 
   const stats = useMemo(() => {
     const totalSpend = filteredCampaigns.reduce((acc, c) => acc + (Number(c.spend) || 0), 0);
@@ -408,13 +410,13 @@ export const AdsCampaign: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-[3rem] border border-slate-100 shadow-2xl shadow-slate-200/40 overflow-hidden mx-2">
-        <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex flex-wrap items-center gap-6">
+        <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex flex-wrap items-center gap-4">
            <div className="relative group flex-1 max-w-md">
               <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-blue-500 transition-colors" />
               <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search Campaign Subject or Brand..." className="w-full pl-12 pr-6 py-4 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/5 text-sm font-bold shadow-sm" />
            </div>
 
-           <div className="flex items-center gap-4">
+           <div className="flex flex-wrap items-center gap-4">
               {/* Boosting Profile Filter Dropdown */}
               <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-5 py-3 shadow-sm transition-all hover:border-blue-200">
                 <div className="flex items-center gap-2 pr-3 border-r border-slate-100">
@@ -435,6 +437,27 @@ export const AdsCampaign: React.FC = () => {
                 </select>
               </div>
 
+              {/* Operating Status Filter Dropdown */}
+              <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-5 py-3 shadow-sm transition-all hover:border-blue-200">
+                <div className="flex items-center gap-2 pr-3 border-r border-slate-100">
+                   <Activity size={14} className="text-blue-500" />
+                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                     Status
+                   </span>
+                </div>
+                <select 
+                  value={filterStatus} 
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="text-sm font-bold text-slate-700 outline-none bg-transparent cursor-pointer min-w-[120px]"
+                >
+                  <option value="">All Status</option>
+                  <option value="Active">Active</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Paused">Paused</option>
+                  <option value="Planned">Planned</option>
+                </select>
+              </div>
+
               <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-5 py-3 shadow-sm transition-all hover:border-blue-200">
                 <div className="flex items-center gap-2 pr-3 border-r border-slate-100">
                    <Filter size={14} className="text-blue-500" />
@@ -449,9 +472,13 @@ export const AdsCampaign: React.FC = () => {
                   onChange={(e) => setFilterMonth(e.target.value)}
                   className="text-sm font-bold text-slate-700 outline-none bg-transparent cursor-pointer"
                 />
-                {( !isFullYearView || filterBoosting !== '' ) && (
+                {( !isFullYearView || filterBoosting !== '' || filterStatus !== '' ) && (
                   <button 
-                    onClick={() => { setFilterMonth(currentYear); setFilterBoosting(''); }} 
+                    onClick={() => { 
+                      setFilterMonth(currentYear); 
+                      setFilterBoosting(''); 
+                      setFilterStatus(''); 
+                    }} 
                     className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-100 transition-all ml-2"
                   >
                     <RotateCcw size={12} /> Reset
