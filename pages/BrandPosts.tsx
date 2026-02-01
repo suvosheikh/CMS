@@ -8,10 +8,11 @@ import {
   TrendingUp, BarChart3, RotateCcw,
   Box, Tag, Layers3, ChevronLeft, Home,
   List, LayoutGrid, Monitor, Globe, Zap,
-  Percent
+  Percent, Layout
 } from 'lucide-react';
 
 type ViewLevel = 'main' | 'sub' | 'brand';
+type ViewMode = 'hierarchy' | 'flat-brand';
 
 interface NavStep {
   level: ViewLevel;
@@ -25,6 +26,7 @@ export const BrandPosts: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('hierarchy');
   
   // Drill-down navigation stack
   const [navStack, setNavStack] = useState<NavStep[]>([
@@ -53,8 +55,18 @@ export const BrandPosts: React.FC = () => {
   const currentStep = navStack[navStack.length - 1];
   const viewLevel = currentStep.level;
 
-  // Identify categories based on the current level in the stack
+  // Identification of items based on view mode
   const activeItems = useMemo(() => {
+    if (viewMode === 'flat-brand') {
+      // Find all items that are level 3 (Brand level)
+      return categories.filter(cat => {
+        const parent = categories.find(p => p.id === cat.parentId);
+        const grandParent = parent ? categories.find(gp => gp.id === parent.parentId) : null;
+        return cat.parentId && parent && grandParent; // It has a parent and a grandparent
+      }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    }
+
+    // Hierarchy mode
     return categories.filter(cat => {
       if (navStack.length === 1) {
         return !cat.parentId; // Main categories
@@ -67,7 +79,7 @@ export const BrandPosts: React.FC = () => {
       }
       return false;
     }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }, [categories, navStack]);
+  }, [categories, navStack, viewMode]);
 
   // Filter posts based on timeline
   const timeFilteredPosts = useMemo(() => {
@@ -98,34 +110,42 @@ export const BrandPosts: React.FC = () => {
   const kpis = useMemo(() => {
     const activeNodes = filteredDisplayItems.length;
     const totalVolume = filteredDisplayItems.reduce((acc, item) => acc + (itemStats[item.id] || 0), 0);
-    const focusLabel = viewLevel.toUpperCase();
+    const focusLabel = viewMode === 'flat-brand' ? 'ALL BRANDS' : viewLevel.toUpperCase();
     
     // Contribution Ratio Calculation
     let ratio = 100;
     let ratioLabel = "Global Scope";
     const globalTotal = timeFilteredPosts.length;
 
-    if (navStack.length === 2) {
-      // We are in Sub-Category level. Show Main Category volume / Global Total
-      const parentId = navStack[1].id;
-      const parentVolume = parentId ? (itemStats[parentId] || 0) : 0;
-      ratio = globalTotal > 0 ? (parentVolume / globalTotal) * 100 : 0;
-      ratioLabel = "Global Weight";
-    } else if (navStack.length === 3) {
-      // We are in Brand level. Show Sub-Category volume / Main Category volume
-      const parentId = navStack[2].id;
-      const grandParentId = navStack[1].id;
-      const parentVolume = parentId ? (itemStats[parentId] || 0) : 0;
-      const grandParentVolume = grandParentId ? (itemStats[grandParentId] || 0) : 0;
-      ratio = grandParentVolume > 0 ? (parentVolume / grandParentVolume) * 100 : 0;
-      ratioLabel = "Parent Contribution";
+    if (viewMode === 'hierarchy') {
+        if (navStack.length === 2) {
+            const parentId = navStack[1].id;
+            const parentVolume = parentId ? (itemStats[parentId] || 0) : 0;
+            ratio = globalTotal > 0 ? (parentVolume / globalTotal) * 100 : 0;
+            ratioLabel = "Global Weight";
+        } else if (navStack.length === 3) {
+            const parentId = navStack[2].id;
+            const grandParentId = navStack[1].id;
+            const parentVolume = parentId ? (itemStats[parentId] || 0) : 0;
+            const grandParentVolume = grandParentId ? (itemStats[grandParentId] || 0) : 0;
+            ratio = grandParentVolume > 0 ? (parentVolume / grandParentVolume) * 100 : 0;
+            ratioLabel = "Parent Contribution";
+        }
+    } else {
+        ratio = globalTotal > 0 ? (totalVolume / globalTotal) * 100 : 0;
+        ratioLabel = "Brands Share";
     }
 
     return { activeNodes, totalVolume, ratio: ratio.toFixed(1), ratioLabel, focusLabel };
-  }, [filteredDisplayItems, itemStats, navStack, viewLevel, timeFilteredPosts]);
+  }, [filteredDisplayItems, itemStats, navStack, viewLevel, timeFilteredPosts, viewMode]);
 
   // Handle drill-down
   const handleItemClick = (item: Category) => {
+    if (viewMode === 'flat-brand') {
+      setSelectedBrandId(item.id);
+      return;
+    }
+
     if (viewLevel === 'main') {
       setNavStack([...navStack, { level: 'sub', id: item.id, name: item.name }]);
       setSearchTerm('');
@@ -133,7 +153,6 @@ export const BrandPosts: React.FC = () => {
       setNavStack([...navStack, { level: 'brand', id: item.id, name: item.name }]);
       setSearchTerm('');
     } else {
-      // Final leaf node (Brand) -> Show Posts Feed
       setSelectedBrandId(item.id);
     }
   };
@@ -182,38 +201,69 @@ export const BrandPosts: React.FC = () => {
             </div>
             <div className="flex flex-col text-left">
               <h1 className="text-4xl font-black text-[#0f172a] tracking-tighter leading-none">
-                {viewLevel === 'main' ? 'Main Category Insights' : viewLevel === 'sub' ? 'Sub Category Insights' : 'Brand Insights'}
+                {viewMode === 'flat-brand' ? 'Brand Intelligence' : 
+                 viewLevel === 'main' ? 'Main Category Insights' : 
+                 viewLevel === 'sub' ? 'Sub Category Insights' : 'Brand Insights'}
               </h1>
               {/* Interactive Path Flow */}
               <div className="flex items-center gap-2 mt-2">
-                 {navStack.map((step, idx) => (
-                   <React.Fragment key={idx}>
-                      {idx > 0 && <ChevronRight size={12} className="text-slate-300" />}
-                      <button 
-                        onClick={() => jumpToStep(idx)}
-                        disabled={idx === navStack.length - 1}
-                        className={`font-black text-[10px] uppercase tracking-widest transition-all ${
-                          idx === 0 ? 'text-blue-600' : 
-                          idx === navStack.length - 1 ? 'text-slate-900 pointer-events-none' : 'text-slate-400'
-                        } ${idx < navStack.length - 1 ? 'hover:text-blue-700 hover:underline underline-offset-4' : ''}`}
-                      >
-                        {idx === 0 ? 'Root Intelligence' : step.name}
-                      </button>
-                   </React.Fragment>
-                 ))}
+                 {viewMode === 'hierarchy' ? (
+                   navStack.map((step, idx) => (
+                     <React.Fragment key={idx}>
+                        {idx > 0 && <ChevronRight size={12} className="text-slate-300" />}
+                        <button 
+                          onClick={() => jumpToStep(idx)}
+                          disabled={idx === navStack.length - 1}
+                          className={`font-black text-[10px] uppercase tracking-widest transition-all ${
+                            idx === 0 ? 'text-blue-600' : 
+                            idx === navStack.length - 1 ? 'text-slate-900 pointer-events-none' : 'text-slate-400'
+                          } ${idx < navStack.length - 1 ? 'hover:text-blue-700 hover:underline underline-offset-4' : ''}`}
+                        >
+                          {idx === 0 ? 'Root Intelligence' : step.name}
+                        </button>
+                     </React.Fragment>
+                   ))
+                 ) : (
+                   <div className="flex items-center gap-2">
+                      <span className="font-black text-[10px] uppercase tracking-widest text-blue-600">Flat View</span>
+                      <ChevronRight size={12} className="text-slate-300" />
+                      <span className="font-black text-[10px] uppercase tracking-widest text-slate-900">All Registered Brands</span>
+                   </div>
+                 )}
               </div>
             </div>
           </div>
         </div>
 
-        {navStack.length > 1 && (
-          <button 
-            onClick={handleGoBack}
-            className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm active:scale-95 group"
-          >
-            <ChevronLeft size={16} strokeWidth={3} className="group-hover:-translate-x-1 transition-transform" /> Go Back
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {/* View Toggles (Red Box Area) */}
+          <div className="bg-white border border-slate-200 p-1.5 rounded-2xl flex items-center shadow-sm">
+             <button 
+               onClick={() => setViewMode('hierarchy')}
+               className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'hierarchy' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600'}`}
+             >
+               Category
+             </button>
+             <button 
+               onClick={() => {
+                 setViewMode('flat-brand');
+                 setSearchTerm('');
+               }}
+               className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'flat-brand' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:text-slate-600'}`}
+             >
+               Brand
+             </button>
+          </div>
+
+          {navStack.length > 1 && viewMode === 'hierarchy' && (
+            <button 
+              onClick={handleGoBack}
+              className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm active:scale-95 group"
+            >
+              <ChevronLeft size={16} strokeWidth={3} className="group-hover:-translate-x-1 transition-transform" /> Go Back
+            </button>
+          )}
+        </div>
       </header>
 
       {/* KPI Cards */}
@@ -268,7 +318,7 @@ export const BrandPosts: React.FC = () => {
           <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-blue-500 transition-colors" size={18} />
           <input 
             type="text" 
-            placeholder="Filter categories in this view..." 
+            placeholder={viewMode === 'flat-brand' ? "Search across all brands..." : "Filter categories in this view..."}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-14 pr-6 py-3.5 bg-white border-none rounded-full outline-none focus:ring-0 text-sm font-bold text-slate-600 placeholder:text-slate-400 shadow-sm"
@@ -294,10 +344,14 @@ export const BrandPosts: React.FC = () => {
         </div>
       </div>
 
-      {/* Drill-down Cards Grid */}
+      {/* Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6 px-2">
         {filteredDisplayItems.map(item => {
           const count = itemStats[item.id] || 0;
+          const parentName = viewMode === 'flat-brand' 
+            ? categories.find(c => c.id === item.parentId)?.name 
+            : null;
+
           return (
             <div 
               key={item.id}
@@ -305,18 +359,21 @@ export const BrandPosts: React.FC = () => {
               className={`p-10 rounded-[3rem] border transition-all cursor-pointer group flex flex-col items-center text-center relative overflow-hidden animate-in fade-in zoom-in-95 duration-500 hover:translate-y-[-8px] bg-white border-slate-100 shadow-sm hover:border-blue-300 hover:shadow-2xl hover:shadow-blue-200/30`}
             >
               <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-8 transition-transform group-hover:scale-110 ${
+                viewMode === 'flat-brand' ? 'bg-amber-50 text-amber-600' :
                 viewLevel === 'main' ? 'bg-blue-50 text-blue-600' : 
                 viewLevel === 'sub' ? 'bg-emerald-50 text-emerald-600' : 
                 'bg-amber-50 text-amber-600'
               }`}>
-                {viewLevel === 'main' ? <Box size={24} /> : 
+                {viewMode === 'flat-brand' ? <Tag size={24} strokeWidth={2.5} /> :
+                 viewLevel === 'main' ? <Box size={24} /> : 
                  viewLevel === 'sub' ? <Layers3 size={24} /> : 
                  <Tag size={24} strokeWidth={2.5} />}
               </div>
               
               <div className="w-full mb-6">
-                <p className="text-[9px] font-black uppercase tracking-[0.2em] mb-2 text-slate-400">
-                  {viewLevel === 'main' ? 'Segment Root' : viewLevel === 'sub' ? 'Branch' : 'Identity'}
+                <p className={`text-[9px] font-black uppercase tracking-[0.2em] mb-2 truncate px-2 ${viewMode === 'flat-brand' ? 'text-blue-500' : 'text-slate-400'}`}>
+                  {viewMode === 'flat-brand' ? (parentName || 'Brand Registry') :
+                   viewLevel === 'main' ? 'Segment Root' : viewLevel === 'sub' ? 'Branch' : 'Identity'}
                 </p>
                 <h3 className="text-xl font-black tracking-tight leading-tight truncate w-full text-slate-900 group-hover:text-blue-600 transition-colors">{item.name}</h3>
               </div>
@@ -362,7 +419,7 @@ export const BrandPosts: React.FC = () => {
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">
-                      {navStack[navStack.length-1].name}
+                      {selectedBrandData?.name || 'Direct Entry'}
                     </span>
                     {filterDate && <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest px-2 py-0.5 border border-slate-200 rounded-lg">{filterDate}</span>}
                   </div>
