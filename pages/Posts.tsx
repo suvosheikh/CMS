@@ -281,7 +281,7 @@ export const Posts: React.FC = () => {
                         <p className="text-sm font-black text-slate-800 tracking-tight transition-colors group-hover:text-slate-950">{post.campaign_name || 'General Content'}</p>
                         {post.asset_link && (
                           <a href={post.asset_link} target="_blank" rel="noreferrer" className="text-[10px] font-black text-blue-500 hover:text-blue-700 flex items-center gap-1.5 mt-1 uppercase tracking-tight transition-all hover:translate-x-1">
-                            View Asset <ExternalLink size={10} strokeWidth={3} />
+                            View Post <ExternalLink size={10} strokeWidth={3} />
                           </a>
                         )}
                       </td>
