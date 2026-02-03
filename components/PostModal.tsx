@@ -204,7 +204,7 @@ export const PostModal: React.FC<PostModalProps> = ({ isOpen, onClose, onSave, i
 
               {/* Asset Link Field */}
               <div>
-                <label className={labelClass}>Post Link (URL)</label>
+                <label className={labelClass}>Asset Link (URL)</label>
                 <div className="relative">
                   <LinkIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                   <input name="asset_link" value={formData.asset_link} onChange={handleChange} placeholder="https://..." className={`${inputClass} pl-14`} />
