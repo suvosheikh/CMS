@@ -1,15 +1,16 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { DBService } from '../services/dbService';
-import { PostLog, Category, User } from '../types';
+import { PostLog, Category, User, PostStatus } from '../types';
 import { 
   Search, Filter, Plus, Download, Edit2, Trash2, 
   ChevronRight, ExternalLink, Calendar, 
   Layers, Package, Monitor, X, Clock, History, CheckCircle, ShieldAlert,
-  RotateCcw
+  RotateCcw, Activity
 } from 'lucide-react';
 import { PostModal } from '../components/PostModal';
 import { ConfirmationModal } from '../components/ConfirmationModal';
+import { POST_STATUSES } from '../constants';
 
 export const Posts: React.FC = () => {
   const [posts, setPosts] = useState<PostLog[]>([]);
@@ -21,6 +22,7 @@ export const Posts: React.FC = () => {
   
   // Filtering States
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<PostStatus | ''>('');
   const [filterMonth, setFilterMonth] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [filterCat, setFilterCat] = useState('');
@@ -61,6 +63,23 @@ export const Posts: React.FC = () => {
     return post.content_type.split(',').map(f => f.trim()).filter(Boolean);
   };
 
+  // Dynamic Categories: Only show categories that have posts in the selected month
+  const dynamicCategories = useMemo(() => {
+    const monthFilteredPosts = filterMonth 
+      ? posts.filter(p => p.month === filterMonth)
+      : posts;
+    
+    const activeCatIds = new Set(monthFilteredPosts.map(p => p.main_category_id));
+    return categories.filter(c => !c.parentId && activeCatIds.has(c.id));
+  }, [posts, categories, filterMonth]);
+
+  // If the currently selected category filter is no longer in the dynamic list, reset it
+  useEffect(() => {
+    if (filterCat && !dynamicCategories.find(c => c.id === filterCat)) {
+      setFilterCat('');
+    }
+  }, [dynamicCategories, filterCat]);
+
   const filteredPosts = useMemo(() => {
     return posts.filter(p => {
       const models = getPostModels(p);
@@ -69,13 +88,14 @@ export const Posts: React.FC = () => {
         p.campaign_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.id.toLowerCase().includes(searchTerm.toLowerCase());
       
+      const matchStatus = filterStatus === '' || p.status === filterStatus;
       const matchMonth = filterMonth === '' || p.month === filterMonth;
       const matchDate = filterDate === '' || p.date === filterDate;
       const matchCat = filterCat === '' || p.main_category_id === filterCat;
       
-      return matchSearch && matchMonth && matchDate && matchCat;
+      return matchSearch && matchStatus && matchMonth && matchDate && matchCat;
     });
-  }, [posts, searchTerm, filterMonth, filterDate, filterCat]);
+  }, [posts, searchTerm, filterStatus, filterMonth, filterDate, filterCat]);
 
   const modelHistoryData = useMemo(() => {
     if (!selectedModelHistory) return [];
@@ -101,6 +121,7 @@ export const Posts: React.FC = () => {
 
   const resetFilters = () => {
     setSearchTerm('');
+    setFilterStatus('');
     setFilterMonth('');
     setFilterDate('');
     setFilterCat('');
@@ -115,7 +136,7 @@ export const Posts: React.FC = () => {
     </div>
   );
 
-  const hasActiveFilters = searchTerm !== '' || filterMonth !== '' || filterDate !== '' || filterCat !== '';
+  const hasActiveFilters = searchTerm !== '' || filterStatus !== '' || filterMonth !== '' || filterDate !== '' || filterCat !== '';
 
   return (
     <div className="space-y-10 pb-20 animate-in fade-in duration-700">
@@ -162,6 +183,22 @@ export const Posts: React.FC = () => {
           />
         </div>
 
+        {/* Lifecycle Filter */}
+        <div className="flex items-center gap-3 bg-white rounded-full px-5 py-3 shadow-sm min-w-[160px] hover:border-blue-200 border border-transparent transition-all">
+           <Activity size={18} className="text-emerald-500" />
+           <div className="flex flex-col flex-1">
+             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Lifecycle</span>
+             <select 
+               value={filterStatus} 
+               onChange={(e) => setFilterStatus(e.target.value as PostStatus | '')} 
+               className="text-xs font-black text-slate-700 outline-none bg-transparent border-none py-0 pr-8 cursor-pointer w-full focus:ring-0"
+             >
+               <option value="">All Stages</option>
+               {POST_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+             </select>
+           </div>
+        </div>
+
         {/* Date Filter */}
         <div className="flex items-center gap-3 bg-white rounded-full px-5 py-3 shadow-sm min-w-[180px] hover:border-blue-200 border border-transparent transition-all">
            <Calendar size={18} className="text-blue-500" />
@@ -190,7 +227,7 @@ export const Posts: React.FC = () => {
            </div>
         </div>
 
-        {/* Category Filter */}
+        {/* Category Filter - Dynamic */}
         <div className="flex items-center gap-3 bg-white rounded-full px-5 py-3 shadow-sm min-w-[200px] hover:border-blue-200 border border-transparent transition-all">
            <Layers size={18} className="text-slate-400" />
            <div className="flex flex-col flex-1">
@@ -200,8 +237,9 @@ export const Posts: React.FC = () => {
                onChange={(e) => setFilterCat(e.target.value)} 
                className="text-xs font-black text-slate-700 outline-none bg-transparent border-none py-0 pr-8 cursor-pointer w-full focus:ring-0"
              >
-               <option value="">All Categories</option>
-               {categories.filter(c => !c.parentId).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+               <option value="">{filterMonth ? 'Active Categories' : 'All Categories'}</option>
+               {dynamicCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+               {dynamicCategories.length === 0 && <option disabled>No items for period</option>}
              </select>
            </div>
         </div>
