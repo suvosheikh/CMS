@@ -56,6 +56,11 @@ export const Posts: React.FC = () => {
     return post.product_model.split(',').map(m => m.trim()).filter(Boolean);
   };
 
+  const getPostFormats = (post: PostLog): string[] => {
+    if (!post.content_type) return [];
+    return post.content_type.split(',').map(f => f.trim()).filter(Boolean);
+  };
+
   const filteredPosts = useMemo(() => {
     return posts.filter(p => {
       const models = getPostModels(p);
@@ -238,6 +243,7 @@ export const Posts: React.FC = () => {
               ) : (
                 filteredPosts.map(post => {
                   const models = getPostModels(post);
+                  const formats = getPostFormats(post);
                   return (
                     <tr key={post.id} className="hover:bg-blue-50/40 transition-all duration-300 group cursor-default">
                       <td className="px-10 py-7">
@@ -257,8 +263,10 @@ export const Posts: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-10 py-7">
-                        <div className="flex gap-2">
-                           <span className="px-2.5 py-1 bg-slate-900 text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-transform group-hover:scale-105">{post.content_type}</span>
+                        <div className="flex flex-wrap gap-2">
+                           {formats.map((f, i) => (
+                             <span key={i} className="px-2.5 py-1 bg-slate-900 text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-transform group-hover:scale-105">{f}</span>
+                           ))}
                            <span className="px-2.5 py-1 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black uppercase tracking-widest transition-transform group-hover:scale-105">{post.content_tag}</span>
                         </div>
                         <div className="flex flex-wrap gap-1.5 mt-3">

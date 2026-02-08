@@ -8,7 +8,7 @@ import {
   Save, CheckCircle, Sparkles, X, Plus, 
   Briefcase, ShieldAlert, Calendar, Layers, 
   Bookmark, Link as LinkIcon, FileText,
-  AlignLeft
+  AlignLeft, Check
 } from 'lucide-react';
 
 export const Entry: React.FC = () => {
@@ -18,10 +18,11 @@ export const Entry: React.FC = () => {
   const [isSuccess, setIsSuccess] = useState(false);
   const [tempModel, setTempModel] = useState('');
   const [uiModels, setUiModels] = useState<string[]>([]);
+  const [selectedFormats, setSelectedFormats] = useState<string[]>(['Static']);
+  
   const [formData, setFormData] = useState<any>({
     id: `P-${Math.floor(1000 + Math.random() * 9000)}`,
     date: new Date().toISOString().split('T')[0],
-    content_type: CONTENT_TYPES[0],
     content_tag: CONTENT_TAGS[0],
     status: 'Planned',
     main_category_id: '',
@@ -65,12 +66,33 @@ export const Entry: React.FC = () => {
     setUiModels(prev => prev.filter((_, i) => i !== index));
   };
 
+  const toggleFormat = (format: string) => {
+    if (isViewer) return;
+    setSelectedFormats(prev => {
+      if (prev.includes(format)) {
+        // Keep at least one selected or allow zero? 
+        // Better to allow toggling off, but logic-wise user usually needs one.
+        const filtered = prev.filter(f => f !== format);
+        return filtered;
+      }
+      return [...prev, format];
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isViewer) return;
+    
+    if (selectedFormats.length === 0) {
+      alert("Please select at least one Content Format.");
+      return;
+    }
+
     const month = formData.date ? formData.date.substring(0, 7) : '';
     const product_model = uiModels.join(', ');
-    const postToSave: PostLog = { ...formData, month, product_model };
+    const content_type = selectedFormats.join(', ');
+    
+    const postToSave: PostLog = { ...formData, month, product_model, content_type };
 
     try {
       await DBService.savePost(postToSave);
@@ -198,20 +220,12 @@ export const Entry: React.FC = () => {
                 </h3>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                  <div>
                     <label className={labelClass}>Brand / Variant</label>
                     <select name="brand_type_id" value={formData.brand_type_id} onChange={handleChange} className={inputClass} disabled={!formData.sub_category_id}>
                       <option value="">None / N/A</option>
                       {brandCats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                 </div>
-                 <div>
-                    <label className={labelClass}>Content Format</label>
-                    <select name="content_type" value={formData.content_type} onChange={handleChange} className={inputClass}>
-                      {CONTENT_TYPES.map(type => (
-                        <option key={type} value={type}>{type}</option>
-                      ))}
                     </select>
                  </div>
                  <div>
@@ -222,9 +236,33 @@ export const Entry: React.FC = () => {
                       ))}
                     </select>
                  </div>
+
+                 {/* Multi-select Content Format */}
+                 <div className="col-span-full">
+                    <label className={labelClass}>Content Format (Select Multiple)</label>
+                    <div className="flex flex-wrap gap-3">
+                       {CONTENT_TYPES.map(type => {
+                         const isSelected = selectedFormats.includes(type);
+                         return (
+                           <button 
+                             key={type}
+                             type="button"
+                             onClick={() => toggleFormat(type)}
+                             className={`px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest border transition-all duration-300 flex items-center gap-2 ${
+                               isSelected 
+                                 ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100' 
+                                 : 'bg-white text-slate-400 border-slate-100 hover:border-blue-200'
+                             }`}
+                           >
+                             {isSelected && <Check size={14} strokeWidth={3} />}
+                             {type}
+                           </button>
+                         );
+                       })}
+                    </div>
+                 </div>
               </div>
 
-              {/* Asset Link Moved to top of this section area */}
               <div>
                 <label className={labelClass}>Asset Link (URL)</label>
                 <div className="relative">
@@ -233,7 +271,6 @@ export const Entry: React.FC = () => {
                 </div>
               </div>
 
-              {/* Product Model Name - Now Full Width Below */}
               <div>
                 <label className={labelClass}>Product Model Name(s)</label>
                 <div className="flex gap-4">
@@ -270,7 +307,6 @@ export const Entry: React.FC = () => {
                 </div>
               </div>
 
-              {/* Notes Field */}
               <div>
                 <label className={labelClass}>Production Notes</label>
                 <div className="relative">
@@ -288,7 +324,6 @@ export const Entry: React.FC = () => {
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="flex flex-col md:flex-row gap-6 pt-12 border-t border-slate-50">
             <button 
               type="submit" 

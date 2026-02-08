@@ -83,7 +83,7 @@ export interface PostLog {
   brand_type_id?: string;
   product_model: string; 
   productModels?: string[]; 
-  content_type: ContentType;
+  content_type: string; // Changed from ContentType to string to support multiples
   content_tag: ContentTag;
   campaign_name?: string;
   status: PostStatus;

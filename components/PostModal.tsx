@@ -6,7 +6,7 @@ import { CONTENT_TYPES, CONTENT_TAGS } from '../constants';
 import { 
   X, Save, Layers, Package, Plus, Trash2, 
   Sparkles, Calendar, Clock, Bookmark, 
-  Link as LinkIcon, FileText, AlignLeft
+  Link as LinkIcon, FileText, AlignLeft, Check
 } from 'lucide-react';
 
 interface PostModalProps {
@@ -20,9 +20,10 @@ export const PostModal: React.FC<PostModalProps> = ({ isOpen, onClose, onSave, i
   const [categories, setCategories] = useState<Category[]>([]);
   const [tempModel, setTempModel] = useState('');
   const [uiModels, setUiModels] = useState<string[]>([]);
+  const [selectedFormats, setSelectedFormats] = useState<string[]>([]);
+  
   const [formData, setFormData] = useState<any>({
     date: new Date().toISOString().split('T')[0],
-    content_type: CONTENT_TYPES[0],
     content_tag: CONTENT_TAGS[0],
     status: 'Planned',
     main_category_id: '',
@@ -42,14 +43,16 @@ export const PostModal: React.FC<PostModalProps> = ({ isOpen, onClose, onSave, i
 
         if (initialData) {
           const models = initialData.product_model ? initialData.product_model.split(',').map(m => m.trim()).filter(Boolean) : [];
+          const formats = initialData.content_type ? initialData.content_type.split(',').map(f => f.trim()).filter(Boolean) : [];
           setUiModels(models);
+          setSelectedFormats(formats);
           setFormData({ ...initialData });
         } else {
           setUiModels([]);
+          setSelectedFormats(['Static']);
           setFormData({
             id: `P-${Math.floor(1000 + Math.random() * 9000)}`,
             date: new Date().toISOString().split('T')[0],
-            content_type: CONTENT_TYPES[0],
             content_tag: CONTENT_TAGS[0],
             status: 'Planned',
             main_category_id: '',
@@ -79,11 +82,28 @@ export const PostModal: React.FC<PostModalProps> = ({ isOpen, onClose, onSave, i
 
   const removeModel = (index: number) => setUiModels(prev => prev.filter((_, i) => i !== index));
 
+  const toggleFormat = (format: string) => {
+    setSelectedFormats(prev => {
+      if (prev.includes(format)) {
+        return prev.filter(f => f !== format);
+      }
+      return [...prev, format];
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (selectedFormats.length === 0) {
+      alert("Please select at least one Content Format.");
+      return;
+    }
+
     const month = formData.date ? formData.date.substring(0, 7) : '';
     const product_model = uiModels.join(', ');
-    onSave({ ...formData, month, product_model } as PostLog);
+    const content_type = selectedFormats.join(', ');
+    
+    onSave({ ...formData, month, product_model, content_type } as PostLog);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -176,20 +196,12 @@ export const PostModal: React.FC<PostModalProps> = ({ isOpen, onClose, onSave, i
                 <div className="w-1.5 h-4 bg-amber-500 rounded-full"></div>
                 <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-800 flex items-center gap-2"><Bookmark size={14} className="text-amber-500" /> Specifications</h3>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
                   <label className={labelClass}>Brand / Variant</label>
                   <select name="brand_type_id" value={formData.brand_type_id || ''} onChange={handleChange} className={inputClass} disabled={!formData.sub_category_id}>
                     <option value="">None / N/A</option>
                     {brandCats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className={labelClass}>Content Format</label>
-                  <select name="content_type" value={formData.content_type} onChange={handleChange} className={inputClass}>
-                    {CONTENT_TYPES.map(type => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
                   </select>
                 </div>
                 <div>
@@ -200,6 +212,30 @@ export const PostModal: React.FC<PostModalProps> = ({ isOpen, onClose, onSave, i
                     ))}
                   </select>
                 </div>
+
+                <div className="col-span-full">
+                    <label className={labelClass}>Content Format (Select Multiple)</label>
+                    <div className="flex flex-wrap gap-3">
+                       {CONTENT_TYPES.map(type => {
+                         const isSelected = selectedFormats.includes(type);
+                         return (
+                           <button 
+                             key={type}
+                             type="button"
+                             onClick={() => toggleFormat(type)}
+                             className={`px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest border transition-all duration-300 flex items-center gap-2 ${
+                               isSelected 
+                                 ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100' 
+                                 : 'bg-white text-slate-400 border-slate-100 hover:border-blue-200'
+                             }`}
+                           >
+                             {isSelected && <Check size={14} strokeWidth={3} />}
+                             {type}
+                           </button>
+                         );
+                       })}
+                    </div>
+                 </div>
               </div>
 
               {/* Asset Link Field */}
