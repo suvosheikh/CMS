@@ -47,9 +47,12 @@ export const Reports: React.FC = () => {
   }, [filteredPosts, categories]);
 
   const contentTypeData = useMemo(() => {
+    // FIX: Account for multi-select strings by splitting and checking inclusion
     return CONTENT_TYPES.map(type => ({
       name: type,
-      value: filteredPosts.filter(p => p.content_type === type).length
+      value: filteredPosts.filter(p => 
+        p.content_type && p.content_type.split(', ').includes(type)
+      ).length
     })).filter(d => d.value > 0);
   }, [filteredPosts]);
 
@@ -97,7 +100,7 @@ export const Reports: React.FC = () => {
         `"${subCat.replace(/"/g, '""')}"`,
         `"${brand.replace(/"/g, '""')}"`,
         `"${(post.product_model || "").replace(/"/g, '""')}"`,
-        post.content_type,
+        `"${(post.content_type || "").replace(/"/g, '""')}"`,
         post.content_tag,
         `"${(post.campaign_name || "General").replace(/"/g, '""')}"`,
         post.status,

@@ -5,7 +5,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { DBService } from '../services/dbService';
 import { PostLog, Category, AdCampaignEntry } from '../types';
 import { CONTENT_TAGS, CONTENT_TYPES } from '../constants';
-import { MoreHorizontal, Activity, ChevronRight, ChevronDown, ChevronUp, Calendar, RotateCcw } from 'lucide-react';
+import { MoreHorizontal, Activity, ChevronRight, ChevronDown, ChevronUp, Calendar, RotateCcw, Plus } from 'lucide-react';
 
 const DonutCard: React.FC<{ 
   label: string, 
@@ -62,12 +62,15 @@ const ProgressCard: React.FC<{
   title: string, 
   items: { label: string, value: number, color: string }[], 
   total: number,
-  isAdsCard?: boolean
-}> = ({ title, items, total, isAdsCard }) => {
+  isAdsCard?: boolean,
+  showValueSum?: boolean
+}> = ({ title, items, total, isAdsCard, showValueSum }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const initialLimit = 5;
   const hasMore = items.length > initialLimit;
   const displayedItems = isExpanded ? items : items.slice(0, initialLimit);
+  
+  const sumOfValues = useMemo(() => items.reduce((acc, curr) => acc + curr.value, 0), [items]);
 
   return (
     <div className="bg-white p-6 pb-8 rounded-[2.5rem] shadow-sm border border-slate-50 flex flex-col h-full transition-all duration-500">
@@ -96,6 +99,16 @@ const ProgressCard: React.FC<{
           </div>
         ))}
       </div>
+
+      {showValueSum && (
+        <div className="mt-6 pt-4 border-t border-slate-100 flex justify-between items-center px-1">
+          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Format Count</span>
+          <div className="flex items-center gap-1.5">
+             <span className="text-[10px] font-black text-slate-400">=</span>
+             <span className="text-sm font-black text-blue-600">{sumOfValues}</span>
+          </div>
+        </div>
+      )}
 
       {hasMore && (
         <button 
@@ -181,9 +194,12 @@ export const Dashboard: React.FC = () => {
     const activeCategories = new Set(filteredPosts.map(p => p.main_category_id)).size;
     const catPercent = categories.length > 0 ? Math.round((activeCategories / categories.length) * 100) : 0;
 
+    // FIX: Use .includes() because content_type can now be a comma-separated string
     const dynamicTypes = CONTENT_TYPES.map(type => ({
       label: type as string,
-      value: filteredPosts.filter(p => p.content_type === type).length,
+      value: filteredPosts.filter(p => 
+        p.content_type && p.content_type.split(', ').includes(type)
+      ).length,
       color: '#3b82f6'
     })).sort((a, b) => b.value - a.value);
 
@@ -307,6 +323,7 @@ export const Dashboard: React.FC = () => {
           title="Creative Format" 
           total={stats.totalPosts}
           items={stats.dynamicTypes}
+          showValueSum={true}
         />
         <ProgressCard 
           title="Strategic Tag" 

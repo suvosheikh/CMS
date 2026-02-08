@@ -98,13 +98,17 @@ export const BrandPosts: React.FC = () => {
     return stats;
   }, [timeFilteredPosts]);
 
-  // Search filter
+  // Search and Zero-Volume filter (Applied to BOTH Hierarchy and Flat views)
   const filteredDisplayItems = useMemo(() => {
     const safeSearch = searchTerm.toLowerCase().trim();
-    return activeItems.filter(item => 
-      !safeSearch || item.name.toLowerCase().includes(safeSearch)
-    );
-  }, [activeItems, searchTerm]);
+    return activeItems.filter(item => {
+      const matchesSearch = !safeSearch || item.name.toLowerCase().includes(safeSearch);
+      const count = itemStats[item.id] || 0;
+      
+      // Filter out items with zero volume in all modes
+      return matchesSearch && count > 0;
+    });
+  }, [activeItems, searchTerm, itemStats]);
 
   // KPI calculations for header
   const kpis = useMemo(() => {
@@ -227,7 +231,7 @@ export const BrandPosts: React.FC = () => {
                    <div className="flex items-center gap-2">
                       <span className="font-black text-[10px] uppercase tracking-widest text-blue-600">Flat View</span>
                       <ChevronRight size={12} className="text-slate-300" />
-                      <span className="font-black text-[10px] uppercase tracking-widest text-slate-900">All Registered Brands</span>
+                      <span className="font-black text-[10px] uppercase tracking-widest text-slate-900">All Active Brands</span>
                    </div>
                  )}
               </div>
@@ -318,7 +322,7 @@ export const BrandPosts: React.FC = () => {
           <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-blue-500 transition-colors" size={18} />
           <input 
             type="text" 
-            placeholder={viewMode === 'flat-brand' ? "Search across all brands..." : "Filter categories in this view..."}
+            placeholder={viewMode === 'flat-brand' ? "Search across active brands..." : "Filter categories with active data..."}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-14 pr-6 py-3.5 bg-white border-none rounded-full outline-none focus:ring-0 text-sm font-bold text-slate-600 placeholder:text-slate-400 shadow-sm"
@@ -400,7 +404,9 @@ export const BrandPosts: React.FC = () => {
           <div className="col-span-full py-32 text-center">
              <div className="flex flex-col items-center gap-6 opacity-30">
                 <List size={64} />
-                <p className="text-lg font-black uppercase tracking-widest">No active nodes in this view level.</p>
+                <p className="text-lg font-black uppercase tracking-widest">
+                  No active data found for this selection.
+                </p>
              </div>
           </div>
         )}
