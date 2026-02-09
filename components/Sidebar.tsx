@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
@@ -13,7 +14,8 @@ import {
   BarChart3,
   Paintbrush,
   Award,
-  BellRing
+  BellRing,
+  CalendarDays
 } from 'lucide-react';
 import { DBService } from '../services/dbService';
 import { User } from '../types';
@@ -47,7 +49,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, isNew }) => {
       </div>
       <div className="flex items-center gap-2">
         {isNew && (
-          <span className="bg-amber-400 text-white text-[9px] px-2 py-0.5 rounded-md font-black uppercase tracking-widest shadow-sm">New</span>
+          <span className="bg-[#ffb800] text-white text-[9px] px-2 py-0.5 rounded-lg font-black uppercase tracking-wider shadow-sm border border-white/10">NEW</span>
         )}
         {badge !== undefined && badge > 0 && (
           <span className={`text-[10px] font-bold min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full transition-all ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-400'}`}>
@@ -112,6 +114,7 @@ export const Sidebar: React.FC<{ onLogout?: () => void }> = ({ onLogout }) => {
         <NavItem to="/categories" icon={<FolderTree size={18} />} label="Categories" badge={counts.categories} />
         <NavItem to="/brands" icon={<Award size={18} />} label="Brand Insights" />
         <NavItem to="/campaigns" icon={<BarChart3 size={18} />} label="Reports" />
+        <NavItem to="/calendar" icon={<CalendarDays size={18} />} label="Calendar" isNew />
         <NavItem to="/ads" icon={<Megaphone size={18} />} label="Ads Campaign" badge={counts.ads} />
         <NavItem to="/creative-store" icon={<Paintbrush size={18} />} label="Creative Store" badge={counts.creatives} />
         <NavItem to="/reminders" icon={<BellRing size={18} />} label="Reminders" badge={counts.reminders} />

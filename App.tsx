@@ -15,6 +15,7 @@ import { AdDetails } from './pages/AdDetails';
 import { Reports } from './pages/Reports';
 import { CreativeStore } from './pages/CreativeStore';
 import { Reminders } from './pages/Reminders';
+import { ContentCalendar } from './pages/ContentCalendar';
 import { DBService } from './services/dbService';
 import { User } from './types';
 import { LogIn, ShieldCheck, Lock, User as UserIcon, AlertCircle, Fingerprint, Shield } from 'lucide-react';
@@ -149,6 +150,7 @@ const App: React.FC = () => {
                 <Route path="/categories" element={<Categories />} />
                 <Route path="/brands" element={<BrandPosts />} />
                 <Route path="/campaigns" element={<Reports />} />
+                <Route path="/calendar" element={<ContentCalendar />} />
                 <Route path="/ads" element={<AdsCampaign />} />
                 <Route path="/ads/:id" element={<AdDetails />} />
                 <Route path="/creative-store" element={<CreativeStore />} />
