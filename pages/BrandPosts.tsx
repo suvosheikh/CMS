@@ -52,42 +52,13 @@ export const BrandPosts: React.FC = () => {
     fetchData();
   }, []);
 
-  const currentStep = navStack[navStack.length - 1];
-  const viewLevel = currentStep.level;
-
-  // Identification of items based on view mode
-  const activeItems = useMemo(() => {
-    if (viewMode === 'flat-brand') {
-      // Find all items that are level 3 (Brand level)
-      return categories.filter(cat => {
-        const parent = categories.find(p => p.id === cat.parentId);
-        const grandParent = parent ? categories.find(gp => gp.id === parent.parentId) : null;
-        return cat.parentId && parent && grandParent; // It has a parent and a grandparent
-      }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    }
-
-    // Hierarchy mode
-    return categories.filter(cat => {
-      if (navStack.length === 1) {
-        return !cat.parentId; // Main categories
-      }
-      if (navStack.length === 2) {
-        return cat.parentId === navStack[1].id; // Sub categories
-      }
-      if (navStack.length === 3) {
-        return cat.parentId === navStack[2].id; // Brands
-      }
-      return false;
-    }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }, [categories, navStack, viewMode]);
-
   // Filter posts based on timeline
   const timeFilteredPosts = useMemo(() => {
     if (!filterDate) return posts;
     return posts.filter(p => p.date && p.date.startsWith(filterDate));
   }, [posts, filterDate]);
 
-  // Calculate volume count for each node at the current level
+  // Calculate volume count for each node at the current level based on active timeline
   const itemStats = useMemo(() => {
     const stats: Record<string, number> = {};
     timeFilteredPosts.forEach(p => {
@@ -98,17 +69,38 @@ export const BrandPosts: React.FC = () => {
     return stats;
   }, [timeFilteredPosts]);
 
-  // Search and Zero-Volume filter (Applied to BOTH Hierarchy and Flat views)
+  const currentStep = navStack[navStack.length - 1];
+  const viewLevel = currentStep.level;
+
+  // Search and display items (All items shown, even with 0 volume)
   const filteredDisplayItems = useMemo(() => {
     const safeSearch = searchTerm.toLowerCase().trim();
-    return activeItems.filter(item => {
+    
+    // 1. Determine active candidates based on View Mode and Drill-down level
+    let candidates: Category[] = [];
+    if (viewMode === 'flat-brand') {
+      // Find all items that are level 3 (Brand level)
+      candidates = categories.filter(cat => {
+        const parent = categories.find(p => p.id === cat.parentId);
+        const grandParent = parent ? categories.find(gp => gp.id === parent.parentId) : null;
+        return cat.parentId && parent && grandParent; 
+      });
+    } else {
+      // Hierarchy mode
+      candidates = categories.filter(cat => {
+        if (navStack.length === 1) return !cat.parentId; // Main categories
+        if (navStack.length === 2) return cat.parentId === navStack[1].id; // Sub categories
+        if (navStack.length === 3) return cat.parentId === navStack[2].id; // Brands
+        return false;
+      });
+    }
+
+    // 2. Apply Search (Zero-Volume removal REMOVED as per user request)
+    return candidates.filter(item => {
       const matchesSearch = !safeSearch || item.name.toLowerCase().includes(safeSearch);
-      const count = itemStats[item.id] || 0;
-      
-      // Filter out items with zero volume in all modes
-      return matchesSearch && count > 0;
-    });
-  }, [activeItems, searchTerm, itemStats]);
+      return matchesSearch;
+    }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [categories, navStack, viewMode, searchTerm]);
 
   // KPI calculations for header
   const kpis = useMemo(() => {
@@ -240,7 +232,7 @@ export const BrandPosts: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* View Toggles (Red Box Area) */}
+          {/* View Toggles */}
           <div className="bg-white border border-slate-200 p-1.5 rounded-2xl flex items-center shadow-sm">
              <button 
                onClick={() => setViewMode('hierarchy')}
@@ -277,7 +269,7 @@ export const BrandPosts: React.FC = () => {
               <Globe size={24} />
            </div>
            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Active Nodes</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Nodes</p>
               <p className="text-3xl font-black text-slate-900 tracking-tighter">{kpis.activeNodes}</p>
            </div>
         </div>
@@ -322,7 +314,7 @@ export const BrandPosts: React.FC = () => {
           <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-blue-500 transition-colors" size={18} />
           <input 
             type="text" 
-            placeholder={viewMode === 'flat-brand' ? "Search across active brands..." : "Filter categories with active data..."}
+            placeholder={viewMode === 'flat-brand' ? "Search across all registered brands..." : "Filter segments..."}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-14 pr-6 py-3.5 bg-white border-none rounded-full outline-none focus:ring-0 text-sm font-bold text-slate-600 placeholder:text-slate-400 shadow-sm"
@@ -360,14 +352,14 @@ export const BrandPosts: React.FC = () => {
             <div 
               key={item.id}
               onClick={() => handleItemClick(item)}
-              className={`p-10 rounded-[3rem] border transition-all cursor-pointer group flex flex-col items-center text-center relative overflow-hidden animate-in fade-in zoom-in-95 duration-500 hover:translate-y-[-8px] bg-white border-slate-100 shadow-sm hover:border-blue-300 hover:shadow-2xl hover:shadow-blue-200/30`}
+              className={`p-10 rounded-[3rem] border transition-all cursor-pointer group flex flex-col items-center text-center relative overflow-hidden animate-in fade-in zoom-in-95 duration-500 hover:translate-y-[-8px] bg-white border-slate-100 shadow-sm hover:border-blue-300 hover:shadow-2xl hover:shadow-blue-200/30 ${count === 0 ? 'bg-slate-50/50 grayscale-[0.5]' : ''}`}
             >
               <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-8 transition-transform group-hover:scale-110 ${
                 viewMode === 'flat-brand' ? 'bg-amber-50 text-amber-600' :
                 viewLevel === 'main' ? 'bg-blue-50 text-blue-600' : 
                 viewLevel === 'sub' ? 'bg-emerald-50 text-emerald-600' : 
                 'bg-amber-50 text-amber-600'
-              }`}>
+              } ${count === 0 ? '!bg-slate-100 !text-slate-400' : ''}`}>
                 {viewMode === 'flat-brand' ? <Tag size={24} strokeWidth={2.5} /> :
                  viewLevel === 'main' ? <Box size={24} /> : 
                  viewLevel === 'sub' ? <Layers3 size={24} /> : 
@@ -375,21 +367,23 @@ export const BrandPosts: React.FC = () => {
               </div>
               
               <div className="w-full mb-6">
-                <p className={`text-[9px] font-black uppercase tracking-[0.2em] mb-2 truncate px-2 ${viewMode === 'flat-brand' ? 'text-blue-500' : 'text-slate-400'}`}>
+                <p className={`text-[9px] font-black uppercase tracking-[0.2em] mb-2 truncate px-2 ${count === 0 ? 'text-slate-400' : viewMode === 'flat-brand' ? 'text-blue-500' : 'text-slate-400'}`}>
                   {viewMode === 'flat-brand' ? (parentName || 'Brand Registry') :
                    viewLevel === 'main' ? 'Segment Root' : viewLevel === 'sub' ? 'Branch' : 'Identity'}
                 </p>
-                <h3 className="text-xl font-black tracking-tight leading-tight truncate w-full text-slate-900 group-hover:text-blue-600 transition-colors">{item.name}</h3>
+                <h3 className={`text-xl font-black tracking-tight leading-tight truncate w-full group-hover:text-blue-600 transition-colors ${count === 0 ? 'text-slate-400' : 'text-slate-900'}`}>{item.name}</h3>
               </div>
 
               <div className="mt-auto pt-6 border-t border-slate-50 w-full flex flex-col">
                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Volume</p>
-                <p className="text-3xl font-black mt-1 text-slate-900">{count}</p>
+                <p className={`text-3xl font-black mt-1 ${count === 0 ? 'text-slate-300' : 'text-slate-900'}`}>{count}</p>
               </div>
 
               {/* Status Indicator Dot */}
-              {count > 0 && (
+              {count > 0 ? (
                 <div className="absolute top-6 left-6 w-2 h-2 bg-emerald-500 rounded-full shadow-sm"></div>
+              ) : (
+                <div className="absolute top-6 left-6 w-2 h-2 bg-slate-200 rounded-full shadow-sm"></div>
               )}
               
               {/* Interaction Indicator */}
@@ -405,7 +399,7 @@ export const BrandPosts: React.FC = () => {
              <div className="flex flex-col items-center gap-6 opacity-30">
                 <List size={64} />
                 <p className="text-lg font-black uppercase tracking-widest">
-                  No active data found for this selection.
+                  No registered segments found.
                 </p>
              </div>
           </div>
@@ -419,7 +413,7 @@ export const BrandPosts: React.FC = () => {
             {/* Modal Header */}
             <div className="p-10 border-b border-slate-50 flex items-center justify-between bg-slate-50/30 sticky top-0 z-10">
               <div className="flex items-center gap-6">
-                <div className="w-16 h-16 bg-blue-600 rounded-3xl flex items-center justify-center text-white shadow-xl shadow-blue-100">
+                <div className={`w-16 h-16 rounded-3xl flex items-center justify-center text-white shadow-xl shadow-blue-100 ${brandPosts.length === 0 ? 'bg-slate-400' : 'bg-blue-600'}`}>
                   <Box size={32} strokeWidth={2.5} />
                 </div>
                 <div>
@@ -445,8 +439,13 @@ export const BrandPosts: React.FC = () => {
             <div className="flex-1 overflow-y-auto p-10 custom-scrollbar space-y-6">
               {brandPosts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-24 text-slate-200 space-y-6">
-                   <Package size={80} strokeWidth={1} />
-                   <p className="text-base font-black uppercase tracking-widest">No historical logs for this brand in the selected month.</p>
+                   <div className="p-8 bg-slate-50 rounded-[2.5rem]">
+                      <Package size={80} strokeWidth={1} />
+                   </div>
+                   <div className="text-center">
+                     <p className="text-base font-black uppercase tracking-widest text-slate-400">Zero-Volume Segment</p>
+                     <p className="text-sm font-bold text-slate-300 mt-2">This category has no historical logs for {filterDate}.</p>
+                   </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-6">
@@ -502,12 +501,12 @@ export const BrandPosts: React.FC = () => {
             {/* Modal Footer */}
             <div className="p-8 border-t border-slate-50 bg-slate-50/20 flex items-center justify-center gap-10">
                <div className="flex items-center gap-3">
-                  <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                  <div className={`w-2.5 h-2.5 rounded-full ${brandPosts.length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div>
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Architecture Sync: Active</span>
                </div>
                <div className="w-px h-6 bg-slate-200"></div>
                <div className="flex items-center gap-3">
-                  <BarChart3 size={18} className="text-blue-600" />
+                  <BarChart3 size={18} className={brandPosts.length > 0 ? 'text-blue-600' : 'text-slate-300'} />
                   <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">{brandPosts.length} Records In-Focus</span>
                </div>
             </div>

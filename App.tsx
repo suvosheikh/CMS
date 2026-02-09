@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
@@ -16,7 +17,7 @@ import { CreativeStore } from './pages/CreativeStore';
 import { Reminders } from './pages/Reminders';
 import { DBService } from './services/dbService';
 import { User } from './types';
-import { LogIn, ShieldCheck, Lock, User as UserIcon, AlertCircle } from 'lucide-react';
+import { LogIn, ShieldCheck, Lock, User as UserIcon, AlertCircle, Fingerprint, Shield } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -67,53 +68,64 @@ const App: React.FC = () => {
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-white rounded-[3rem] shadow-2xl shadow-slate-200 border border-slate-100 overflow-hidden">
-          <div className="p-10 bg-blue-600 text-white text-center">
-            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur-md">
-              <ShieldCheck size={32} />
+        <div className="max-w-[440px] w-full bg-white rounded-[3.5rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.08)] border border-slate-100 overflow-hidden">
+          <div className="p-12 pb-8 text-center flex flex-col items-center">
+            {/* Custom Logo Component based on Image */}
+            <div className="w-20 h-20 bg-blue-600 rounded-[1.75rem] flex items-center justify-center text-white shadow-xl shadow-blue-100 mb-6">
+              <Fingerprint size={40} strokeWidth={1.5} />
             </div>
-            <h1 className="text-3xl font-black tracking-tighter mb-2">RYANS</h1>
-            <p className="text-blue-100 font-medium">Workspace Dashboard</p>
-          </div>
-          
-          <div className="p-10 space-y-6">
+            
+            <div className="flex flex-col items-center mb-10">
+               <h1 className="text-4xl font-black italic tracking-tighter text-[#76b82a] leading-none mb-1">RYANS</h1>
+               <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Workspace</span>
+                  <span className="text-blue-600 font-black text-xs">•</span>
+                  <span className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">MarCom</span>
+               </div>
+            </div>
+            
             {error && (
-              <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3 text-red-600 animate-shake">
+              <div className="w-full p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3 text-red-600 animate-shake mb-6">
                 <AlertCircle size={18} className="mt-0.5 shrink-0" />
-                <p className="text-xs font-bold leading-tight">{error}</p>
+                <p className="text-xs font-bold leading-tight text-left">{error}</p>
               </div>
             )}
             
-            <form onSubmit={handleLogin} className="space-y-6">
-              <div className="space-y-4">
+            <form onSubmit={handleLogin} className="w-full space-y-8 text-left">
+              <div className="space-y-6">
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Username / Email</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mb-3 block ml-1">Identity Access</label>
                   <div className="relative">
-                    <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                    <UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                     <input 
                       type="text" required value={username} onChange={(e) => setUsername(e.target.value)}
-                      className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-blue-500/5 outline-none font-bold text-sm"
-                      placeholder="Username"
+                      className="w-full pl-14 pr-6 py-4 bg-slate-50/50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500/20 focus:bg-white outline-none font-bold text-sm text-slate-600 placeholder:text-slate-300 transition-all"
+                      placeholder="Username or Email"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Security Key</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mb-3 block ml-1">Security Key</label>
                   <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                    <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                     <input 
                       type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-blue-500/5 outline-none font-bold text-sm"
+                      className="w-full pl-14 pr-6 py-4 bg-slate-50/50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500/20 focus:bg-white outline-none font-bold text-sm text-slate-600 placeholder:text-slate-300 transition-all"
                       placeholder="••••••••"
                     />
                   </div>
                 </div>
               </div>
 
-              <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-100 flex items-center justify-center gap-3 active:scale-[0.98] transition-all hover:bg-blue-700">
-                <LogIn size={18} /> Enter Dashboard
+              <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-[1.75rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-200 flex items-center justify-center gap-3 active:scale-[0.98] transition-all hover:bg-blue-700">
+                <LogIn size={20} strokeWidth={2.5} /> Authorize Session
               </button>
             </form>
+          </div>
+          
+          <div className="p-8 border-t border-slate-50 flex items-center justify-center gap-2 bg-slate-50/30">
+            <Shield size={14} className="text-emerald-500" />
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">Encrypted Governance Mode</span>
           </div>
         </div>
       </div>
